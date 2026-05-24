@@ -115,57 +115,55 @@
 
 ## Traceability
 
-*(Populated by roadmapper — updated after ROADMAP.md is created)*
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| AUTH-03 | — | Pending |
-| AUTH-04 | — | Pending |
-| PRES-01 | — | Pending |
-| PRES-02 | — | Pending |
-| CALL-01 | — | Pending |
-| CALL-02 | — | Pending |
-| CALL-03 | — | Pending |
-| CALL-04 | — | Pending |
-| CALL-05 | — | Pending |
-| CALL-06 | — | Pending |
-| CALL-07 | — | Pending |
-| CALL-08 | — | Pending |
-| CTRL-01 | — | Pending |
-| CTRL-02 | — | Pending |
-| CTRL-03 | — | Pending |
-| CTRL-04 | — | Pending |
-| CTRL-05 | — | Pending |
-| CTRL-06 | — | Pending |
-| CTRL-07 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| SCRN-01 | — | Pending |
-| SCRN-02 | — | Pending |
-| SCRN-03 | — | Pending |
-| SCRN-04 | — | Pending |
-| GRP-01 | — | Pending |
-| GRP-02 | — | Pending |
-| GRP-03 | — | Pending |
-| GRP-04 | — | Pending |
-| GRP-05 | — | Pending |
-| REC-01 | — | Pending |
-| REC-02 | — | Pending |
-| REC-03 | — | Pending |
-| REC-04 | — | Pending |
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| PRES-01 | Phase 2 | Pending |
+| PRES-02 | Phase 2 | Pending |
+| CALL-01 | Phase 4 | Pending |
+| CALL-02 | Phase 4 | Pending |
+| CALL-03 | Phase 4 | Pending |
+| CALL-04 | Phase 4 | Pending |
+| CALL-05 | Phase 2 | Pending |
+| CALL-06 | Phase 2 | Pending |
+| CALL-07 | Phase 4 | Pending |
+| CALL-08 | Phase 4 | Pending |
+| CTRL-01 | Phase 5 | Pending |
+| CTRL-02 | Phase 5 | Pending |
+| CTRL-03 | Phase 5 | Pending |
+| CTRL-04 | Phase 5 | Pending |
+| CTRL-05 | Phase 5 | Pending |
+| CTRL-06 | Phase 5 | Pending |
+| CTRL-07 | Phase 5 | Pending |
+| UI-01 | Phase 3 | Pending |
+| UI-02 | Phase 3 | Pending |
+| UI-03 | Phase 4 | Pending |
+| SCRN-01 | Phase 6 | Pending |
+| SCRN-02 | Phase 6 | Pending |
+| SCRN-03 | Phase 6 | Pending |
+| SCRN-04 | Phase 6 | Pending |
+| GRP-01 | Phase 7 | Pending |
+| GRP-02 | Phase 7 | Pending |
+| GRP-03 | Phase 7 | Pending |
+| GRP-04 | Phase 7 | Pending |
+| GRP-05 | Phase 7 | Pending |
+| REC-01 | Phase 8 | Pending |
+| REC-02 | Phase 8 | Pending |
+| REC-03 | Phase 8 | Pending |
+| REC-04 | Phase 8 | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 8 | Pending |
+| INFRA-03 | Phase 1 | Pending |
+| INFRA-04 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 41 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 41 ⚠️ (will be resolved by roadmapper)
+- Mapped to phases: 41 (roadmap complete)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-24*
-*Last updated: 2026-05-24 after initial definition*
+*Last updated: 2026-05-24 after roadmap creation — all 41 requirements mapped to phases 1-8*
