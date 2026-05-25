@@ -14,8 +14,8 @@
 
 ### Online Presence
 
-- [ ] **PRES-01**: User can see a realtime list of currently online users (auto-updates on join/leave without page reload)
-- [ ] **PRES-02**: User's online/offline status is automatically updated when they log in, log out, or disconnect
+- [x] **PRES-01**: User can see a realtime list of currently online users (auto-updates on join/leave without page reload)
+- [x] **PRES-02**: User's online/offline status is automatically updated when they log in, log out, or disconnect
 
 ### Core Video Call (1-1)
 
@@ -23,8 +23,8 @@
 - [ ] **CALL-02**: The callee receives an incoming call notification (modal with caller name, Accept and Reject buttons, ringtone audio)
 - [ ] **CALL-03**: User can accept or reject an incoming call
 - [ ] **CALL-04**: After acceptance, a WebRTC P2P video + audio connection is established between the two peers
-- [ ] **CALL-05**: Signaling is performed via WebSocket (STOMP) exchanging SDP offer/answer and ICE candidates
-- [ ] **CALL-06**: Google public STUN server is used for ICE candidate resolution
+- [x] **CALL-05**: Signaling is performed via WebSocket (STOMP) exchanging SDP offer/answer and ICE candidates
+- [x] **CALL-06**: Google public STUN server is used for ICE candidate resolution
 - [ ] **CALL-07**: Unanswered calls automatically cancel after ~30 seconds with a "No answer" notification
 - [ ] **CALL-08**: Either party can cancel the call before connection is established
 
@@ -121,14 +121,14 @@
 | AUTH-02 | Phase 1 | Pending |
 | AUTH-03 | Phase 1 | Pending |
 | AUTH-04 | Phase 1 | Pending |
-| PRES-01 | Phase 2 | Pending |
-| PRES-02 | Phase 2 | Pending |
+| PRES-01 | Phase 2 | Complete |
+| PRES-02 | Phase 2 | Complete |
 | CALL-01 | Phase 4 | Pending |
 | CALL-02 | Phase 4 | Pending |
 | CALL-03 | Phase 4 | Pending |
 | CALL-04 | Phase 4 | Pending |
-| CALL-05 | Phase 2 | Pending |
-| CALL-06 | Phase 2 | Pending |
+| CALL-05 | Phase 2 | Complete |
+| CALL-06 | Phase 2 | Complete |
 | CALL-07 | Phase 4 | Pending |
 | CALL-08 | Phase 4 | Pending |
 | CTRL-01 | Phase 5 | Pending |
@@ -160,6 +160,7 @@
 | INFRA-04 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 41 total
 - Mapped to phases: 41 (roadmap complete)
 - Unmapped: 0

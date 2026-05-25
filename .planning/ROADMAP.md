@@ -170,7 +170,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Backend Foundation | 3/3 | Done | 2026-05-25 |
-| 2. WebSocket Infrastructure | 3/3 | Complete   | 2026-05-25 |
+| 2. WebSocket Infrastructure | 3/3 | Complete    | 2026-05-25 |
 | 3. React Auth + User List | 0/? | Not started | - |
 | 4. 1-1 Call Core | 0/? | Not started | - |
 | 5. Call Controls | 0/? | Not started | - |
