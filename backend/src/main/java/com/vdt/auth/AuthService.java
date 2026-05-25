@@ -23,13 +23,13 @@ public class AuthService {
     private final JwtService jwtService;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.username())) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new UsernameAlreadyExistsException("Username already taken");
         }
         User user = User.builder()
-                .username(request.username())
-                .passwordHash(passwordEncoder.encode(request.password()))
-                .displayName(request.username())  // D-11: display_name defaults to username
+                .username(request.getUsername())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .displayName(request.getUsername())
                 .status(UserStatus.OFFLINE)
                 .build();
         userRepository.save(user);
@@ -39,15 +39,14 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password())
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
-        // Mark user ONLINE after successful authentication (AUTH-03)
-        userRepository.findByUsername(request.username())
+        userRepository.findByUsername(request.getUsername())
                 .ifPresent(u -> {
                     u.setStatus(UserStatus.ONLINE);
                     userRepository.save(u);
                 });
-        String token = jwtService.generateToken(request.username());
+        String token = jwtService.generateToken(request.getUsername());
         return new AuthResponse(token);
     }
 

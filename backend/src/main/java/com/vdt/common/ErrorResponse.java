@@ -1,6 +1,14 @@
 package com.vdt.common;
 
-public record ErrorResponse(String error, String message) {
-    // Java record — immutable, with auto-generated constructor, getters, equals, hashCode
-    // Jackson serializes to: { "error": "...", "message": "..." }
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ErrorResponse {
+
+    private String error;
+    private String message;
 }
