@@ -6,8 +6,8 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 
 ## Phases
 
-- [ ] **Phase 1: Backend Foundation** - REST API + JWT auth + database schema; server accepts registrations and logins
-- [ ] **Phase 2: WebSocket Infrastructure** - STOMP signaling relay + presence service; online user list broadcasts in realtime
+- [x] **Phase 1: Backend Foundation** - REST API + JWT auth + database schema; server accepts registrations and logins
+- [x] **Phase 2: WebSocket Infrastructure** - STOMP signaling relay + presence service; online user list broadcasts in realtime (completed 2026-05-25)
 - [ ] **Phase 3: React Auth + User List** - Login/Register UI + live user list; a user can open the app and see who is online
 - [ ] **Phase 4: 1-1 Call Core** - Full WebRTC P2P video call end-to-end; two users can call each other and see video
 - [ ] **Phase 5: Call Controls** - Mic/camera toggles, end-call, duration timer, connection status, self-view; all UX controls work during a live call
@@ -34,15 +34,15 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 **Plans:** 3 plansPlans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Project scaffold (Maven, application.yml, Flyway V1, User entity/repo, Dockerfile, FlywayMigrationTest)
+- [x] 01-01-PLAN.md — Project scaffold (Maven, application.yml, Flyway V1, User entity/repo, Dockerfile, FlywayMigrationTest)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Security infrastructure (JwtService, JwtAuthenticationFilter, CustomUserDetailsService, SecurityConfig, GlobalExceptionHandler)
+- [x] 01-02-PLAN.md — Security infrastructure (JwtService, JwtAuthenticationFilter, CustomUserDetailsService, SecurityConfig, GlobalExceptionHandler)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — Auth endpoints (DTOs, AuthService, AuthController, GET /api/users/me, AuthControllerTest)
+- [x] 01-03-PLAN.md — Auth endpoints (DTOs, AuthService, AuthController, GET /api/users/me, AuthControllerTest)
 
 **UI hint:** no
 
@@ -59,7 +59,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   3. When a user disconnects, all other clients receive a presence update removing them within seconds
   4. A signaling message sent to `/app/signal` is routed to the correct recipient's private queue using the JWT principal as the sender identity
 
-**Plans:** TBD
+**Plans:** 3/3 plans complete
 **UI hint:** no
 
 ### Phase 3: React Auth + User List
@@ -169,8 +169,8 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Foundation | 0/? | Not started | - |
-| 2. WebSocket Infrastructure | 0/? | Not started | - |
+| 1. Backend Foundation | 3/3 | Done | 2026-05-25 |
+| 2. WebSocket Infrastructure | 3/3 | Complete   | 2026-05-25 |
 | 3. React Auth + User List | 0/? | Not started | - |
 | 4. 1-1 Call Core | 0/? | Not started | - |
 | 5. Call Controls | 0/? | Not started | - |
