@@ -996,22 +996,25 @@ Recommendation: Start with separate H2 migration for tests; add Testcontainers i
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Java version targeting in pom.xml**
    - What we know: Java 25 is installed; Spring Boot 3.3.x requires Java 17+
    - What's unclear: Should `<java.version>` target 17 (maximum compatibility) or 21 (modern LTS) or 25 (installed version)?
    - Recommendation: Target Java 17 in pom.xml for broadest compatibility. The installed JDK 25 can compile Java 17 source. If assessor runs on JDK 17, bytecode will still work.
+   - **RESOLVED: Target Java 17 bytecode (`<java.version>17</java.version>` in pom.xml). Plans implement this.**
 
 2. **Test database strategy: H2 vs Testcontainers**
    - What we know: PostgreSQL native ENUM types are not supported by H2
    - What's unclear: Whether the planner wants full-fidelity PostgreSQL tests in Phase 1 or deferred to later
    - Recommendation: Use H2 with a separate `V1__init_schema_h2.sql` for `src/test/resources`. This avoids requiring Docker in CI. Flag Testcontainers as a Phase 5+ concern.
+   - **RESOLVED: H2 with separate `src/test/resources/db/migration/h2/V1__init_schema.sql` (no PostgreSQL ENUM). Plans implement this.**
 
 3. **`/api/users/me` protected endpoint**
    - What we know: AUTH-04 requires a protected endpoint to demonstrate JWT authentication
    - What's unclear: Whether to create a minimal `/api/users/me` endpoint in Phase 1 or rely on Phase 2's user endpoints
    - Recommendation: Add a minimal `GET /api/users/me` that returns `{ username, displayName, status }` from the security principal. This satisfies AUTH-04 with a real endpoint without scope creep.
+   - **RESOLVED: Minimal `GET /api/users/me` endpoint implemented in `UserController.java` in Plan 01-03. Satisfies AUTH-04.**
 
 ---
 
