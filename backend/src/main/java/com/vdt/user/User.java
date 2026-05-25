@@ -25,7 +25,7 @@ public class User {
     private String displayName;
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "user_status", nullable = false)  // REQUIRED for PostgreSQL ENUM
+    @Column(nullable = false, length = 10)
     private UserStatus status = UserStatus.OFFLINE;
 
     @Column(name = "created_at", nullable = false, updatable = false)
