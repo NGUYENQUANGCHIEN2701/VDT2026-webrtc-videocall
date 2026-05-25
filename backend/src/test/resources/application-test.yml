@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=RETURNING
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -9,6 +9,9 @@ spring:
     hibernate:
       ddl-auto: none       # Flyway test migration owns schema
     database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect  # Override main application.yml PostgreSQLDialect
 
   flyway:
     enabled: true
