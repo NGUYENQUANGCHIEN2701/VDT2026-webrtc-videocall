@@ -6,8 +6,10 @@ import { http, HttpResponse } from 'msw'
 import { server } from './mocks/server'
 import { MOCK_TOKEN } from './mocks/handlers'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { WebSocketProvider } from '@/contexts/WebSocketContext'
 import AuthPage from '@/pages/AuthPage'
+
+// Must match the Axios baseURL in src/lib/api.ts
+const API_BASE = 'http://localhost:8080'
 
 // Mock useNavigate from react-router-dom
 const mockNavigate = vi.fn()
@@ -75,7 +77,7 @@ describe('AuthPage', () => {
 
   it('UI-01: 401 from login shows Alert with exact copy', async () => {
     server.use(
-      http.post('/api/auth/login', () =>
+      http.post(`${API_BASE}/api/auth/login`, () =>
         HttpResponse.json({ message: 'Invalid credentials' }, { status: 401 })
       )
     )
@@ -97,7 +99,7 @@ describe('AuthPage', () => {
 
   it('UI-01: 409 on register tab shows "Username already taken. Please choose another."', async () => {
     server.use(
-      http.post('/api/auth/register', () =>
+      http.post(`${API_BASE}/api/auth/register`, () =>
         HttpResponse.json({ message: 'Username taken' }, { status: 409 })
       )
     )
@@ -122,7 +124,7 @@ describe('AuthPage', () => {
   it('UI-01: submit button shows Loader2 spinner and "Signing in..." while loading', async () => {
     // Use a delayed response
     server.use(
-      http.post('/api/auth/login', async () => {
+      http.post(`${API_BASE}/api/auth/login`, async () => {
         await new Promise((resolve) => setTimeout(resolve, 200))
         return HttpResponse.json({ token: MOCK_TOKEN })
       })
@@ -152,7 +154,7 @@ describe('AuthPage', () => {
   it('register tab: passwords mismatch blocks submit with inline error, no network call', async () => {
     let requestFired = false
     server.use(
-      http.post('/api/auth/register', () => {
+      http.post(`${API_BASE}/api/auth/register`, () => {
         requestFired = true
         return HttpResponse.json({ token: MOCK_TOKEN }, { status: 201 })
       })
@@ -177,7 +179,7 @@ describe('AuthPage', () => {
   it('client-side username min-length validation shows error, no network call', async () => {
     let requestFired = false
     server.use(
-      http.post('/api/auth/login', () => {
+      http.post(`${API_BASE}/api/auth/login`, () => {
         requestFired = true
         return HttpResponse.json({ token: MOCK_TOKEN })
       })
