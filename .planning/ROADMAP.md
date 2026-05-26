@@ -75,11 +75,11 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   3. When a second browser tab logs in, the first tab's user list updates automatically (no refresh required)
   4. When a user logs out, the app returns to the login screen and their name disappears from other users' lists
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 **Wave 0**
 
-- [ ] 03-01-PLAN.md — Project scaffold (Vite+TS+Tailwind v3+shadcn@2.3.0), all runtime deps, AuthContext, WebSocketContext, ProtectedRoute, Axios interceptor, test infrastructure with stubs
+- [x] 03-01-PLAN.md — Project scaffold (Vite+TS+Tailwind v3+shadcn@2.3.0), all runtime deps, AuthContext, WebSocketContext, ProtectedRoute, Axios interceptor, test infrastructure with stubs
 
 **Wave 1** *(blocked on Wave 0)*
 
@@ -184,7 +184,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 |-------|----------------|--------|-----------|
 | 1. Backend Foundation | 3/3 | Done | 2026-05-25 |
 | 2. WebSocket Infrastructure | 3/3 | Complete    | 2026-05-25 |
-| 3. React Auth + User List | 0/3 | Planned | - |
+| 3. React Auth + User List | 1/3 | In Progress|  |
 | 4. 1-1 Call Core | 0/? | Not started | - |
 | 5. Call Controls | 0/? | Not started | - |
 | 6. Screen Sharing | 0/? | Not started | - |

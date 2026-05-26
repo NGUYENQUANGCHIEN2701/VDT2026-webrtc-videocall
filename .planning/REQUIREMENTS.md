@@ -40,8 +40,8 @@
 
 ### UI Screens
 
-- [ ] **UI-01**: Login/Register screen is functional and styled
-- [ ] **UI-02**: Online user list screen displays connected users with call initiation button
+- [x] **UI-01**: Login/Register screen is functional and styled
+- [x] **UI-02**: Online user list screen displays connected users with call initiation button
 - [ ] **UI-03**: 1-1 video call screen is stable with local/remote video and call controls bar
 
 ### Screen Sharing
@@ -138,8 +138,8 @@
 | CTRL-05 | Phase 5 | Pending |
 | CTRL-06 | Phase 5 | Pending |
 | CTRL-07 | Phase 5 | Pending |
-| UI-01 | Phase 3 | Pending |
-| UI-02 | Phase 3 | Pending |
+| UI-01 | Phase 3 | Complete |
+| UI-02 | Phase 3 | Complete |
 | UI-03 | Phase 4 | Pending |
 | SCRN-01 | Phase 6 | Pending |
 | SCRN-02 | Phase 6 | Pending |
