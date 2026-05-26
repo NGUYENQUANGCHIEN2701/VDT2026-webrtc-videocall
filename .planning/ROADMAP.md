@@ -106,7 +106,25 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   5. Either party can cancel the call before connection is established; both sides return to idle state
   6. The video call screen is stable showing local and remote video streams simultaneously
 
-**Plans:** TBD
+**Plans:** 5 plans
+
+**Wave 0**
+
+- [ ] 04-01-PLAN.md — Test infrastructure (RTCPeerConnection global mock) + app shell refactor (BrowserRouter to main.tsx per D-04) + stub files (CallContext, IncomingCallModal, useRingtone, CallPage) + test scaffolds
+
+**Wave 1** *(blocked on Wave 0)*
+
+- [ ] 04-02-PLAN.md — CallContext full implementation: signal dispatch (D-05), state machine (D-03), WebRTC offer/answer/ICE buffering, 30s timeout, ICE recovery (D-08/D-09), teardown, toasts
+
+**Wave 2** *(blocked on Wave 1 — parallel within wave)*
+
+- [ ] 04-03-PLAN.md — IncomingCallModal + useRingtone (Web Audio API 800Hz beep per D-10/D-11) vertical slice for CALL-02 + CALL-03
+- [ ] 04-04-PLAN.md — CallPage /call route with remote video full-screen + local PiP + hang-up button vertical slice for UI-03
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 04-05-PLAN.md — UserListPage wire-up (startCall, outgoing-call state per UI-SPEC §5.2) + manual two-tab UAT covering all six Phase 4 success criteria
+
 **UI hint:** yes
 
 ### Phase 5: Call Controls
