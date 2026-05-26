@@ -7,7 +7,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 ## Phases
 
 - [x] **Phase 1: Backend Foundation** - REST API + JWT auth + database schema; server accepts registrations and logins
-- [x] **Phase 2: WebSocket Infrastructure** - STOMP signaling relay + presence service; online user list broadcasts in realtime (completed 2026-05-25)
+- [x] **Phase 2: WebSocket Infrastructure** - STOMP signaling relay + presence service; online user list broadcasts in realtime (completed 2026-05-25)
 - [ ] **Phase 3: React Auth + User List** - Login/Register UI + live user list; a user can open the app and see who is online
 - [ ] **Phase 4: 1-1 Call Core** - Full WebRTC P2P video call end-to-end; two users can call each other and see video
 - [ ] **Phase 5: Call Controls** - Mic/camera toggles, end-call, duration timer, connection status, self-view; all UX controls work during a live call
@@ -75,7 +75,20 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   3. When a second browser tab logs in, the first tab's user list updates automatically (no refresh required)
   4. When a user logs out, the app returns to the login screen and their name disappears from other users' lists
 
-**Plans:** TBD
+**Plans:** 3 plans
+
+**Wave 0**
+
+- [ ] 03-01-PLAN.md — Project scaffold (Vite+TS+Tailwind v3+shadcn@2.3.0), all runtime deps, AuthContext, WebSocketContext, ProtectedRoute, Axios interceptor, test infrastructure with stubs
+
+**Wave 1** *(blocked on Wave 0)*
+
+- [ ] 03-02-PLAN.md — UI-01 vertical slice: Login/Register tabbed AuthPage with API integration, error states, STOMP connect on login success
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 03-03-PLAN.md — UI-02 vertical slice: UserListPage with skeleton, live presence rows, self-filter, empty state, logout flow
+
 **UI hint:** yes
 
 ### Phase 4: 1-1 Call Core
@@ -171,7 +184,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 |-------|----------------|--------|-----------|
 | 1. Backend Foundation | 3/3 | Done | 2026-05-25 |
 | 2. WebSocket Infrastructure | 3/3 | Complete    | 2026-05-25 |
-| 3. React Auth + User List | 0/? | Not started | - |
+| 3. React Auth + User List | 0/3 | Planned | - |
 | 4. 1-1 Call Core | 0/? | Not started | - |
 | 5. Call Controls | 0/? | Not started | - |
 | 6. Screen Sharing | 0/? | Not started | - |
