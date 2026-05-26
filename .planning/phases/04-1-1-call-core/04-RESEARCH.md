@@ -648,7 +648,7 @@ useEffect(() => {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **React 19 actual version vs CLAUDE.md stated version**
    - What we know: `package.json` shows `react: ^19.2.6`. CLAUDE.md says "React 18.x".
