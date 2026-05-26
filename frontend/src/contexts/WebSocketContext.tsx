@@ -34,6 +34,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           setOnlineUsers(users)
           setIsLoading(false)
         })
+        // Race condition fix: the backend broadcasts presence on SessionConnectedEvent,
+        // which fires before this SUBSCRIBE frame reaches the server. Request a fresh
+        // broadcast now that we are subscribed and guaranteed to receive it.
+        stompClient.publish({ destination: '/app/presence/sync', body: '' })
       },
       onStompError: (frame) => {
         console.error('STOMP error:', frame.headers['message'])
