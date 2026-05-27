@@ -66,12 +66,16 @@ vi.stubGlobal('RTCIceCandidate', MockRTCIceCandidate)
 // ──────────────────────────────────────────────────────────────────
 // Global navigator.mediaDevices.getUserMedia mock
 // jsdom does not implement getUserMedia — stub to resolve with a
-// mock MediaStream exposing getTracks() returning mock tracks each
-// with a stop() vi.fn().
+// mock MediaStream exposing getTracks() / getAudioTracks() /
+// getVideoTracks() returning mockable track objects with stop() and
+// enabled properties for Phase 5 toggle tests.
 // ──────────────────────────────────────────────────────────────────
-const mockTrack = { stop: vi.fn() }
+export const mockAudioTrack = { stop: vi.fn(), enabled: true }
+export const mockVideoTrack = { stop: vi.fn(), enabled: true }
 const mockMediaStream = {
-  getTracks: vi.fn().mockReturnValue([mockTrack]),
+  getTracks: vi.fn().mockReturnValue([mockAudioTrack]),
+  getAudioTracks: vi.fn().mockReturnValue([mockAudioTrack]),
+  getVideoTracks: vi.fn().mockReturnValue([mockVideoTrack]),
 }
 
 vi.stubGlobal('navigator', {
