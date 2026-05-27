@@ -33,10 +33,10 @@
 - [x] **CTRL-01**: User can mute/unmute their microphone during a call
 - [x] **CTRL-02**: User can turn their camera on/off during a call
 - [x] **CTRL-03**: User can end the call at any time; all tracks and peer connections are cleaned up
-- [ ] **CTRL-04**: A call duration timer is displayed once the connection is established
+- [x] **CTRL-04**: A call duration timer is displayed once the connection is established
 - [x] **CTRL-05**: Connection status is shown during the call (Connecting... / Connected / Reconnecting... / Failed)
-- [ ] **CTRL-06**: Local video self-view is shown as a small overlay (picture-in-picture style, mirrored)
-- [ ] **CTRL-07**: Remote video is displayed as the dominant full-screen view with the remote user's name overlay
+- [x] **CTRL-06**: Local video self-view is shown as a small overlay (picture-in-picture style, mirrored)
+- [x] **CTRL-07**: Remote video is displayed as the dominant full-screen view with the remote user's name overlay
 
 ### UI Screens
 
@@ -134,10 +134,10 @@
 | CTRL-01 | Phase 5 | Complete |
 | CTRL-02 | Phase 5 | Complete |
 | CTRL-03 | Phase 5 | Complete |
-| CTRL-04 | Phase 5 | Pending |
+| CTRL-04 | Phase 5 | Complete |
 | CTRL-05 | Phase 5 | Complete |
-| CTRL-06 | Phase 5 | Pending |
-| CTRL-07 | Phase 5 | Pending |
+| CTRL-06 | Phase 5 | Complete |
+| CTRL-07 | Phase 5 | Complete |
 | UI-01 | Phase 3 | Complete |
 | UI-02 | Phase 3 | Complete |
 | UI-03 | Phase 4 | Pending |

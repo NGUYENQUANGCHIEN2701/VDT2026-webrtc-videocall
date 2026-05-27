@@ -10,7 +10,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 - [x] **Phase 2: WebSocket Infrastructure** - STOMP signaling relay + presence service; online user list broadcasts in realtime (completed 2026-05-25)
 - [x] **Phase 3: React Auth + User List** - Login/Register UI + live user list; a user can open the app and see who is online (completed 2026-05-26)
 - [ ] **Phase 4: 1-1 Call Core** - Full WebRTC P2P video call end-to-end; two users can call each other and see video
-- [ ] **Phase 5: Call Controls** - Mic/camera toggles, end-call, duration timer, connection status, self-view; all UX controls work during a live call
+- [x] **Phase 5: Call Controls** - Mic/camera toggles, end-call, duration timer, connection status, self-view; all UX controls work during a live call (completed 2026-05-27)
 - [ ] **Phase 6: Screen Sharing** - Share screen during a call with no renegotiation; remote peer sees the screen automatically
 - [ ] **Phase 7: Group Call (Mesh)** - 3-5 participant group calls over mesh P2P with dynamic grid UI
 - [ ] **Phase 8: Recording + Deliverables** - Local call recording + Docker Compose + README; project is fully packaged for submission
@@ -142,7 +142,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   5. Connection status (Connecting / Connected / Reconnecting / Failed) is displayed as a visual indicator throughout the call lifecycle
   6. The user's own video appears as a small mirrored overlay; the remote user's video fills the dominant view with the remote user's name overlaid
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 **Wave 1**
 
@@ -150,7 +150,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 05-02-PLAN.md — Extend CallPage: 3-button control bar + timer overlay + status overlay + useCallTimer hook + Cancel button in UserListPage + component tests
+- [x] 05-02-PLAN.md — Extend CallPage: 3-button control bar + timer overlay + status overlay + useCallTimer hook + Cancel button in UserListPage + component tests
 
 **UI hint:** yes
 
@@ -213,7 +213,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 | 2. WebSocket Infrastructure | 3/3 | Complete    | 2026-05-25 |
 | 3. React Auth + User List | 3/3 | Done | 2026-05-26 |
 | 4. 1-1 Call Core | 0/? | Not started | - |
-| 5. Call Controls | 1/2 | In Progress|  |
+| 5. Call Controls | 2/2 | Complete   | 2026-05-27 |
 | 6. Screen Sharing | 0/? | Not started | - |
 | 7. Group Call (Mesh) | 0/? | Not started | - |
 | 8. Recording + Deliverables | 0/? | Not started | - |
