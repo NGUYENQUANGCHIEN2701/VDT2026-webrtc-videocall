@@ -1,10 +1,10 @@
-import { describe, it, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CallPage from '@/pages/CallPage'
 
 // ──────────────────────────────────────────────────────────────────
-// Mutable mock values — Plan 04 will mutate these per test case
+// Mutable mock values — mutated per test case
 // ──────────────────────────────────────────────────────────────────
 const mockHangUp = vi.fn()
 let mockLocalStream: MediaStream | null = null
@@ -26,11 +26,6 @@ vi.mock('@/contexts/CallContext', () => ({
   }),
 }))
 
-// Suppress unused variable warnings — Plan 04 mutates these in test bodies
-void mockLocalStream
-void mockRemoteStream
-void mockPeerUsername
-
 function renderCallPage() {
   return render(
     <MemoryRouter initialEntries={['/call']}>
@@ -39,54 +34,84 @@ function renderCallPage() {
   )
 }
 
-// Reference renderCallPage so tsc noUnusedLocals is satisfied (all it.skip in Wave 0)
-// Plan 04 will call this directly in each active test body.
-void renderCallPage
-
 // ──────────────────────────────────────────────────────────────────
-// Test scaffold — Wave 0 stubs
-// Plan 04 converts it.skip → it and fills each body.
-// Descriptions match VALIDATION.md requirement IDs exactly.
+// Test suite — Plan 04 activates all tests
 // ──────────────────────────────────────────────────────────────────
 describe('CallPage', () => {
 
+  beforeEach(() => {
+    mockHangUp.mockClear()
+    mockLocalStream = null
+    mockRemoteStream = null
+    mockPeerUsername = 'bob'
+  })
+
   // UI-03: remote video element
-  it.skip('UI-03: renders remote <video> with aria-label="Remote video stream"', () => {
-    // Plan 04 implements:
-    // - renderCallPage()
-    // - expect screen.getByRole('video', { name: 'Remote video stream' }) or
-    //   screen.getByLabelText('Remote video stream') to be in document
+  it('UI-03: renders remote <video> with aria-label="Remote video stream"', () => {
+    renderCallPage()
+    const remoteVideo = screen.getByLabelText('Remote video stream')
+    expect(remoteVideo).toBeInTheDocument()
+    expect(remoteVideo.tagName).toBe('VIDEO')
+    expect(remoteVideo).not.toHaveAttribute('muted')
   })
 
   // UI-03: local video element (muted, self-view)
-  it.skip('UI-03: renders local <video> with aria-label="Local video preview" and muted attribute', () => {
-    // Plan 04 implements:
-    // - renderCallPage()
-    // - const localVideo = screen.getByLabelText('Local video preview')
-    // - expect localVideo).toHaveAttribute('muted')
+  it('UI-03: renders local <video> with aria-label="Local video preview" and muted attribute', () => {
+    renderCallPage()
+    const localVideo = screen.getByLabelText('Local video preview')
+    expect(localVideo).toBeInTheDocument()
+    expect(localVideo.tagName).toBe('VIDEO')
+    expect(localVideo).toHaveAttribute('muted')
+    expect(localVideo.className).toContain('scale-x-[-1]')
   })
 
   // UI-03: hang-up button accessibility
-  it.skip('UI-03: hang-up button has aria-label="End call"', () => {
-    // Plan 04 implements:
-    // - renderCallPage()
-    // - expect screen.getByRole('button', { name: 'End call' }) to be in document
+  it('UI-03: hang-up button has aria-label="End call"', () => {
+    renderCallPage()
+    const endCallButton = screen.getByRole('button', { name: 'End call' })
+    expect(endCallButton).toBeInTheDocument()
   })
 
   // UI-03: hang-up button click
-  it.skip('UI-03: clicking hang-up button calls hangUp()', () => {
-    // Plan 04 implements:
-    // - renderCallPage()
-    // - userEvent.click(screen.getByRole('button', { name: 'End call' }))
-    // - expect mockHangUp called once
+  it('UI-03: clicking hang-up button calls hangUp()', () => {
+    renderCallPage()
+    const endCallButton = screen.getByRole('button', { name: 'End call' })
+    fireEvent.click(endCallButton)
+    expect(mockHangUp).toHaveBeenCalledTimes(1)
   })
 
   // UI-03: remote video placeholder when stream is null
-  it.skip('UI-03: shows "Waiting for remote video..." placeholder when remoteStream is null', () => {
-    // Plan 04 implements:
-    // - set mockRemoteStream = null
-    // - renderCallPage()
-    // - expect screen.getByText('Waiting for remote video...') to be in document
+  it('UI-03: shows "Waiting for remote video..." placeholder when remoteStream is null', () => {
+    mockRemoteStream = null
+    renderCallPage()
+    expect(screen.getByText('Waiting for remote video...')).toBeInTheDocument()
+  })
+
+  // UI-03: peer username overlay
+  it('UI-03: renders peer username overlay top-left when peerUsername is set', () => {
+    mockPeerUsername = 'bob'
+    renderCallPage()
+    expect(screen.getByText('bob')).toBeInTheDocument()
+  })
+
+  // Pitfall 3: srcObject updates when remoteStream changes
+  it('Pitfall 3: srcObject of remote video updates when remoteStream changes from null to a value', () => {
+    const { rerender } = renderCallPage()
+
+    // Initially null — video srcObject should be null
+    const remoteVideo = screen.getByLabelText('Remote video stream') as HTMLVideoElement
+    expect(remoteVideo.srcObject).toBeNull()
+
+    // Update mockRemoteStream and rerender
+    const fakeStream = { getTracks: () => [] } as unknown as MediaStream
+    mockRemoteStream = fakeStream
+    rerender(
+      <MemoryRouter initialEntries={['/call']}>
+        <CallPage />
+      </MemoryRouter>
+    )
+
+    expect(remoteVideo.srcObject).toBe(fakeStream)
   })
 
 })
