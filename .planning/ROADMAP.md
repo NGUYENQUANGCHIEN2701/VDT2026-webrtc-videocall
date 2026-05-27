@@ -142,7 +142,16 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   5. Connection status (Connecting / Connected / Reconnecting / Failed) is displayed as a visual indicator throughout the call lifecycle
   6. The user's own video appears as a small mirrored overlay; the remote user's video fills the dominant view with the remote user's name overlaid
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Extend CallContext: isMuted/isCameraOff/iceState state + toggleMute/toggleCamera functions + teardown resets + unit tests
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 05-02-PLAN.md — Extend CallPage: 3-button control bar + timer overlay + status overlay + useCallTimer hook + Cancel button in UserListPage + component tests
+
 **UI hint:** yes
 
 ### Phase 6: Screen Sharing
