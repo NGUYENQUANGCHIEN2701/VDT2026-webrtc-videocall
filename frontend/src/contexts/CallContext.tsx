@@ -1,4 +1,16 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useWebSocket } from '@/contexts/WebSocketContext'
+import { useAuth } from '@/contexts/AuthContext'
+import type { IMessage } from '@stomp/stompjs'
 
 // ──────────────────────────────────────────────────────────────────
 // Types (D-02, D-03) — exported so downstream plans can import
@@ -24,61 +36,397 @@ export interface CallContextValue {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Context — null default per project pattern (never use undefined)
+// Signal DTO — mirrors backend SignalMessage.java
+// { to, type, payload, from } — from is overwritten server-side
+// ──────────────────────────────────────────────────────────────────
+type SignalMessage = {
+  to: string
+  type: string
+  payload: string
+  from: string
+}
+
+// ──────────────────────────────────────────────────────────────────
+// ICE config — Google public STUN; no TURN needed for LAN demo
+// ──────────────────────────────────────────────────────────────────
+const ICE_CONFIG: RTCConfiguration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Context — null default per project pattern
 // ──────────────────────────────────────────────────────────────────
 const CallContext = createContext<CallContextValue | null>(null)
 
 // ──────────────────────────────────────────────────────────────────
-// Provider — stub implementation (Plan 02 owns the real WebRTC logic)
+// Provider — full WebRTC implementation
 // D-04: CallProvider is innermost in the provider tree, inside
 // WebSocketProvider and AuthProvider so it can call useWebSocket()
-// and useAuth(). It also calls useNavigate() (works because
-// BrowserRouter is outermost per D-04).
-//
-// Plan 02 will:
-//   - Add imports: useEffect, useRef, useNavigate, useWebSocket, useAuth, IMessage
-//   - Replace useState constants with useState + setters
-//   - Add useRef declarations for pcRef, localStreamRef, peerUsernameRef,
-//     iceCandidateBufferRef, remoteDescSetRef, teardownTimerRef, callTimeoutRef
-//   - Implement startCall, acceptCall, rejectCall, hangUp with real WebRTC logic
-//   - Add STOMP signal subscription in a useEffect watching client connectivity
+// and useAuth(). useNavigate() works because BrowserRouter is
+// outermost per D-04.
 // ──────────────────────────────────────────────────────────────────
 export function CallProvider({ children }: { children: ReactNode }) {
-  const [callStatus] = useState<CallStatus>('idle')
-  const [peerUsername] = useState<string | null>(null)
-  const [localStream] = useState<MediaStream | null>(null)
-  const [remoteStream] = useState<MediaStream | null>(null)
-  const [toasts] = useState<Toast[]>([])
+  const { client, subscribe, publish } = useWebSocket()
+  const { username } = useAuth()
+  const navigate = useNavigate()
 
-  // Stub no-op functions — Plan 02 replaces these bodies with real WebRTC logic
-  const startCall = async (_targetUsername: string): Promise<void> => {
-    // Plan 02: self-call guard, getUserMedia, RTCPeerConnection, offer, publish call-request
+  // ── React state ─────────────────────────────────────────────────
+  const [callStatus, setCallStatus] = useState<CallStatus>('idle')
+  const [peerUsername, setPeerUsername] = useState<string | null>(null)
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null)
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  // ── Refs (RESEARCH Pattern 1 — stale closure prevention) ────────
+  const pcRef = useRef<RTCPeerConnection | null>(null)
+  const localStreamRef = useRef<MediaStream | null>(null)
+  const peerUsernameRef = useRef<string | null>(null)        // Pitfall 2 fix
+  const iceCandidateBufferRef = useRef<RTCIceCandidate[]>([])
+  const remoteDescSetRef = useRef(false)
+  const teardownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Mirror peerUsername state → ref (Pitfall 2) ─────────────────
+  useEffect(() => {
+    peerUsernameRef.current = peerUsername
+  }, [peerUsername])
+
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  /**
+   * Append a toast; auto-dismiss after 3 seconds (UI-SPEC §5.4).
+   */
+  const addToast = useCallback((message: string, style: string) => {
+    const id = crypto.randomUUID()
+    setToasts((prev) => [...prev, { id, message, style }])
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 3000)
+  }, [])
+
+  /**
+   * Publish a signal via STOMP /app/signal.
+   */
+  const publishSignal = useCallback(
+    (msg: { type: string; to: string; payload: string }) => {
+      publish('/app/signal', JSON.stringify(msg))
+    },
+    [publish],
+  )
+
+  /**
+   * Drain buffered ICE candidates after setRemoteDescription (RESEARCH Pattern 2).
+   * Must be called after every setRemoteDescription.
+   */
+  const drainIceCandidateBuffer = useCallback(async () => {
+    remoteDescSetRef.current = true
+    for (const candidate of iceCandidateBufferRef.current) {
+      await pcRef.current?.addIceCandidate(candidate)
+    }
+    iceCandidateBufferRef.current = []
+  }, [])
+
+  /**
+   * Teardown sequence (RESEARCH Pattern 4 — order matters):
+   * 1. Cancel timers
+   * 2. Stop media tracks (releases camera/mic indicator)
+   * 3. Close peer connection
+   * 4. Reset refs
+   * 5. Update React state last
+   */
+  const teardown = useCallback(() => {
+    // 1. Cancel pending timers
+    if (teardownTimerRef.current !== null) {
+      clearTimeout(teardownTimerRef.current)
+      teardownTimerRef.current = null
+    }
+    if (callTimeoutRef.current !== null) {
+      clearTimeout(callTimeoutRef.current)
+      callTimeoutRef.current = null
+    }
+
+    // 2. Stop media tracks
+    localStreamRef.current?.getTracks().forEach((t) => t.stop())
+    localStreamRef.current = null
+
+    // 3. Close peer connection
+    pcRef.current?.close()
+    pcRef.current = null
+
+    // 4. Reset refs
+    iceCandidateBufferRef.current = []
+    remoteDescSetRef.current = false
+    peerUsernameRef.current = null
+
+    // 5. Update React state
+    setLocalStream(null)
+    setRemoteStream(null)
+    setPeerUsername(null)
+    setCallStatus('idle')
+  }, [])
+
+  /**
+   * Create RTCPeerConnection with ICE config and attach event handlers.
+   * (RESEARCH Pattern 1 — reads refs in handlers to avoid stale closures)
+   */
+  const createPeerConnection = useCallback((): RTCPeerConnection => {
+    const pc = new RTCPeerConnection(ICE_CONFIG)
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        publishSignal({
+          type: 'ice-candidate',
+          to: peerUsernameRef.current!,
+          payload: JSON.stringify(event.candidate),
+        })
+      }
+    }
+
+    pc.ontrack = (event) => {
+      setRemoteStream(event.streams[0])
+    }
+
+    // D-08/D-09 ICE state recovery
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState
+      if (state === 'disconnected') {
+        // Grace window — browser may self-recover from transient glitch
+        teardownTimerRef.current = setTimeout(teardown, 2000)
+      } else if (state === 'failed') {
+        if (teardownTimerRef.current !== null) {
+          clearTimeout(teardownTimerRef.current)
+          teardownTimerRef.current = null
+        }
+        teardown()
+        addToast('Connection lost', 'bg-slate-800 border border-red-600/40 text-red-400')
+      } else if (state === 'connected' || state === 'completed') {
+        // Cancel grace timer if connection recovered
+        if (teardownTimerRef.current !== null) {
+          clearTimeout(teardownTimerRef.current)
+          teardownTimerRef.current = null
+        }
+        setCallStatus('connected')
+      }
+    }
+
+    return pc
+  }, [publishSignal, teardown, addToast])
+
+  // ── Signal handler ───────────────────────────────────────────────
+
+  /**
+   * Dispatch incoming STOMP signal frames by type (D-05 full table).
+   * Wrapped in try/catch with teardown fallback — Open Question 2 / T-4-02/T-4-05.
+   */
+  const handleSignal = useCallback(
+    async (msg: SignalMessage) => {
+      try {
+        switch (msg.type) {
+          // ── Incoming call-request → transition to ringing ──────
+          case 'call-request': {
+            setPeerUsername(msg.from)
+            peerUsernameRef.current = msg.from
+            setCallStatus('ringing')
+            break
+          }
+
+          // ── Callee accepted → caller creates offer ─────────────
+          case 'call-accept': {
+            if (callTimeoutRef.current !== null) {
+              clearTimeout(callTimeoutRef.current)
+              callTimeoutRef.current = null
+            }
+            const pc = pcRef.current!
+            const offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+            publishSignal({
+              type: 'offer',
+              to: peerUsernameRef.current!,
+              payload: JSON.stringify(offer),
+            })
+            navigate('/call')
+            break
+          }
+
+          // ── Callee declined → teardown + toast ─────────────────
+          case 'call-decline': {
+            teardown()
+            addToast('Call declined', 'bg-slate-800 border border-red-600/40 text-red-400')
+            break
+          }
+
+          // ── Remote ended call → teardown + toast ───────────────
+          case 'call-end': {
+            teardown()
+            addToast('Call ended', 'bg-slate-800 border border-slate-700 text-slate-400')
+            break
+          }
+
+          // ── Callee receives offer → set remote desc + answer ───
+          case 'offer': {
+            const pc = pcRef.current!
+            const offerInit = JSON.parse(msg.payload) as RTCSessionDescriptionInit
+            await pc.setRemoteDescription(new RTCSessionDescription(offerInit))
+            await drainIceCandidateBuffer()
+            const answer = await pc.createAnswer()
+            await pc.setLocalDescription(answer)
+            publishSignal({
+              type: 'answer',
+              to: peerUsernameRef.current!,
+              payload: JSON.stringify(answer),
+            })
+            break
+          }
+
+          // ── Caller receives answer → set remote desc ───────────
+          case 'answer': {
+            const pc = pcRef.current!
+            const answerInit = JSON.parse(msg.payload) as RTCSessionDescriptionInit
+            await pc.setRemoteDescription(new RTCSessionDescription(answerInit))
+            await drainIceCandidateBuffer()
+            break
+          }
+
+          // ── ICE candidate — buffer if no remote desc yet (Pitfall 1) ─
+          case 'ice-candidate': {
+            const candidate = new RTCIceCandidate(
+              JSON.parse(msg.payload) as RTCIceCandidateInit,
+            )
+            if (!remoteDescSetRef.current) {
+              iceCandidateBufferRef.current.push(candidate)
+            } else {
+              await pcRef.current?.addIceCandidate(candidate)
+            }
+            break
+          }
+
+          default:
+            console.warn('[CallContext] Unknown signal type:', msg.type)
+        }
+      } catch (err) {
+        // T-4-02/T-4-05: Malformed SDP or ICE payload throws DOMException —
+        // teardown prevents stuck call state.
+        console.error('[CallContext] Signal handler error:', err)
+        teardown()
+        addToast('Connection lost', 'bg-slate-800 border border-red-600/40 text-red-400')
+      }
+    },
+    [publishSignal, navigate, teardown, addToast, drainIceCandidateBuffer],
+  )
+
+  // ── STOMP subscription (RESEARCH Pattern 3) ─────────────────────
+  useEffect(() => {
+    if (!client?.connected) return
+
+    const sub = subscribe('/user/queue/signal', (frame: IMessage) => {
+      const msg = JSON.parse(frame.body) as SignalMessage
+      // handleSignal is async but STOMP callback must be sync —
+      // fire-and-forget; errors caught inside handleSignal
+      void handleSignal(msg)
+    })
+
+    return () => {
+      sub?.unsubscribe()
+    }
+  }, [client, subscribe, handleSignal])
+
+  // ── Public actions ───────────────────────────────────────────────
+
+  /**
+   * CALL-01: Initiate an outgoing call.
+   * Pitfall 6: do NOT createOffer here — offer is created in call-accept handler.
+   * T-4-03: Guard against self-call.
+   */
+  const startCall = async (targetUsername: string): Promise<void> => {
+    // Self-call guard (T-4-03)
+    if (targetUsername === username) return
+
+    setPeerUsername(targetUsername)
+    peerUsernameRef.current = targetUsername
+    setCallStatus('calling')
+
+    // Acquire local media
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    localStreamRef.current = stream
+    setLocalStream(stream)
+
+    // Create peer connection and add tracks
+    const pc = createPeerConnection()
+    stream.getTracks().forEach((t) => pc.addTrack(t, stream))
+    pcRef.current = pc
+
+    // Signal call-request to callee
+    publishSignal({ type: 'call-request', to: targetUsername, payload: '' })
+
+    // 30-second no-answer timeout (CALL-07)
+    callTimeoutRef.current = setTimeout(() => {
+      publishSignal({ type: 'call-end', to: peerUsernameRef.current!, payload: '' })
+      addToast('No answer', 'bg-slate-800 border border-amber-600/40 text-amber-400')
+      teardown()
+    }, 30_000)
   }
 
+  /**
+   * CALL-03: Accept an incoming call.
+   * Acquires media, creates pc, signals call-accept, navigates to /call (D-07).
+   * Does NOT createAnswer here — callee waits for 'offer' signal (Pitfall 6).
+   */
   const acceptCall = async (): Promise<void> => {
-    // Plan 02: getUserMedia, answer, navigate('/call')
+    const target = peerUsernameRef.current!
+
+    // Acquire local media
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    localStreamRef.current = stream
+    setLocalStream(stream)
+
+    // Create peer connection and add tracks
+    const pc = createPeerConnection()
+    stream.getTracks().forEach((t) => pc.addTrack(t, stream))
+    pcRef.current = pc
+
+    // Signal call-accept to caller (caller will now create offer)
+    publishSignal({ type: 'call-accept', to: target, payload: '' })
+
+    // Navigate to call page (D-07)
+    navigate('/call')
+
+    // Optimistic connected state — ICE will confirm via oniceconnectionstatechange
+    setCallStatus('connected')
   }
 
+  /**
+   * CALL-03: Reject an incoming call.
+   */
   const rejectCall = (): void => {
-    // Plan 02: publish call-decline signal, reset to idle
+    publishSignal({ type: 'call-decline', to: peerUsernameRef.current!, payload: '' })
+    peerUsernameRef.current = null
+    setPeerUsername(null)
+    setCallStatus('idle')
   }
 
+  /**
+   * CALL-08: Hang up the current call.
+   * Sends call-end signal then runs teardown.
+   */
   const hangUp = (): void => {
-    // Plan 02: publish call-end signal, teardown, reset state
+    publishSignal({ type: 'call-end', to: peerUsernameRef.current!, payload: '' })
+    teardown()
   }
 
   return (
-    <CallContext.Provider value={{
-      localStream,
-      remoteStream,
-      callStatus,
-      peerUsername,
-      toasts,
-      startCall,
-      acceptCall,
-      rejectCall,
-      hangUp,
-    }}>
+    <CallContext.Provider
+      value={{
+        localStream,
+        remoteStream,
+        callStatus,
+        peerUsername,
+        toasts,
+        startCall,
+        acceptCall,
+        rejectCall,
+        hangUp,
+      }}
+    >
       {children}
     </CallContext.Provider>
   )

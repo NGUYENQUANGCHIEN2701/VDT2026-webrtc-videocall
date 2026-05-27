@@ -158,22 +158,26 @@ describe('CallContext', () => {
 
     const { result } = renderHook(() => useCall(), { wrapper })
 
+    // startCall uses getUserMedia (async) — run with fake timers by
+    // using vi.runAllTicks() / runAllTimersAsync pattern
     await act(async () => {
-      await result.current.startCall('bob')
+      // Need to run async tasks while fake timers are active
+      const startCallPromise = result.current.startCall('bob')
+      // Flush microtasks so getUserMedia resolves
+      await vi.runAllTicks()
+      await startCallPromise
     })
 
     expect(result.current.callStatus).toBe('calling')
 
-    // Advance 30 seconds to trigger timeout
-    act(() => {
+    // Advance 30 seconds to trigger timeout callback
+    await act(async () => {
       vi.advanceTimersByTime(30_000)
+      // Flush any microtasks triggered by the timeout callback
+      await vi.runAllTicks()
     })
 
-    await waitFor(() => {
-      expect(result.current.callStatus).toBe('idle')
-    })
-
-    // Should have published call-end signal
+    // Verify call-end was published
     const callEndPublish = mockPublish.mock.calls.find((call) => {
       try {
         const body = JSON.parse(call[1] as string) as { type: string }
@@ -184,7 +188,10 @@ describe('CallContext', () => {
     })
     expect(callEndPublish).toBeDefined()
 
-    // Should have added "No answer" toast
+    // Verify state reset to idle
+    expect(result.current.callStatus).toBe('idle')
+
+    // Verify "No answer" toast added
     expect(result.current.toasts.some((t) => t.message === 'No answer')).toBe(true)
   })
 
