@@ -39,6 +39,10 @@ function renderCallPage() {
   )
 }
 
+// Reference renderCallPage so tsc noUnusedLocals is satisfied (all it.skip in Wave 0)
+// Plan 04 will call this directly in each active test body.
+void renderCallPage
+
 // ──────────────────────────────────────────────────────────────────
 // Test scaffold — Wave 0 stubs
 // Plan 04 converts it.skip → it and fills each body.
