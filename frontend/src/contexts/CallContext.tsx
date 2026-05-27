@@ -365,9 +365,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
     peerUsernameRef.current = targetUsername
     setCallStatus('calling')
 
+    // Signal call-request first so callee sees the modal immediately,
+    // before we block on getUserMedia (which can take a few seconds to prompt)
+    publishSignal({ type: 'call-request', to: targetUsername, payload: '' })
+
+    // 30-second no-answer timeout (CALL-07)
+    callTimeoutRef.current = setTimeout(() => {
+      publishSignal({ type: 'call-end', to: peerUsernameRef.current!, payload: '' })
+      addToast('No answer', 'bg-slate-800 border border-amber-600/40 text-amber-400')
+      teardown()
+    }, 30_000)
+
     // Acquire local media (with audio-only fallback if no camera)
     const stream = await getLocalStream()
     if (!stream) {
+      // Cancel the outgoing call — callee modal will dismiss on receiving call-end
+      publishSignal({ type: 'call-end', to: targetUsername, payload: '' })
       teardown()
       return
     }
@@ -378,16 +391,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const pc = createPeerConnection()
     stream.getTracks().forEach((t) => pc.addTrack(t, stream))
     pcRef.current = pc
-
-    // Signal call-request to callee
-    publishSignal({ type: 'call-request', to: targetUsername, payload: '' })
-
-    // 30-second no-answer timeout (CALL-07)
-    callTimeoutRef.current = setTimeout(() => {
-      publishSignal({ type: 'call-end', to: peerUsernameRef.current!, payload: '' })
-      addToast('No answer', 'bg-slate-800 border border-amber-600/40 text-amber-400')
-      teardown()
-    }, 30_000)
   }
 
   /**
