@@ -622,17 +622,19 @@ const mockMediaStream = {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Cancel button placement during "Calling..." state**
    - What we know: Phase 4 deferred "Caller-side explicit Cancel button while 'Calling...'". `hangUp()` already correctly cancels (sends `call-end`, runs teardown).
    - What's unclear: Should the cancel button be in `UserListPage` (where the user sits during "Calling...") or should there be a transition to a separate "Calling..." overlay?
    - Recommendation: Keep it simple — add a `Cancel` button to `UserListPage` visible when `callStatus === 'calling'`, next to the existing "Calling..." spinner row. No new route or overlay needed. Planner should decide exact placement.
+   - RESOLVED: Plan 05-02 Task 2 adds a Cancel ghost button to `UserListPage` in the `isCallingThisUser` branch, wired to `hangUp()`. No new route or overlay.
 
 2. **Unmount cleanup responsibility**
    - What we know: Phase 4 SUMMARY.md left a TODO marker in `CallPage.tsx` for MediaStream unmount cleanup.
    - What's unclear: Should cleanup live in `CallPage` `useEffect` cleanup, or should `CallContext` add a provider-level cleanup effect?
    - Recommendation: Add a `useEffect` cleanup in `CallPage` that calls `hangUp()` on unmount (if `callStatus !== 'idle'`). This ensures tracks are stopped even if user navigates away via browser back button. `hangUp()` is already idempotent-safe in teardown.
+   - RESOLVED: Plan 05-02 Task 2 adds `useEffect(() => { return () => { if (callStatus !== 'idle') hangUp() } }, [])` in `CallPage` on component unmount.
 
 ---
 
