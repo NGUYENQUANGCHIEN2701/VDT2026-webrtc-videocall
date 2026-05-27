@@ -58,10 +58,12 @@ describe('CallPage', () => {
   // UI-03: local video element (muted, self-view)
   it('UI-03: renders local <video> with aria-label="Local video preview" and muted attribute', () => {
     renderCallPage()
-    const localVideo = screen.getByLabelText('Local video preview')
+    const localVideo = screen.getByLabelText('Local video preview') as HTMLVideoElement
     expect(localVideo).toBeInTheDocument()
     expect(localVideo.tagName).toBe('VIDEO')
-    expect(localVideo).toHaveAttribute('muted')
+    // React sets `muted` as a DOM property, not an HTML attribute — use .muted instead of toHaveAttribute
+    // This is a jsdom limitation: boolean media attributes need property access, not getAttribute()
+    expect(localVideo.muted).toBe(true)
     expect(localVideo.className).toContain('scale-x-[-1]')
   })
 
