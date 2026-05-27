@@ -63,41 +63,190 @@
 
 ---
 
+## Mô hình hoạt động
+
+Hệ thống hoạt động theo 3 giai đoạn nối tiếp nhau:
+
+### Giai đoạn 1 — Xác thực (REST + JWT)
+
+```
+Client                          Spring Boot                    PostgreSQL
+  │                                  │                              │
+  ├─ POST /api/auth/register ────────►│                              │
+  │   { username, password }         ├─ BCrypt hash password ───────►│
+  │                                  │◄─ INSERT users row ───────────┤
+  │◄─ 201 Created ───────────────────┤                              │
+  │                                  │                              │
+  ├─ POST /api/auth/login ───────────►│                              │
+  │   { username, password }         ├─ SELECT + verify hash ────────►│
+  │                                  │◄─ User found ─────────────────┤
+  │                                  ├─ UPDATE status = ONLINE ──────►│
+  │                                  ├─ generate JWT (HS256, 24h)    │
+  │◄─ { token, username } ───────────┤                              │
+  │                                  │                              │
+```
+
+Client lưu JWT vào memory (không localStorage). Mọi request REST sau đó đều gửi kèm header `Authorization: Bearer <token>`. `JwtAuthenticationFilter` intercept và xác thực token trước khi request đến controller.
+
+### Giai đoạn 2 — Kết nối WebSocket và theo dõi presence
+
+```
+Client                          Spring Boot
+  │                                  │
+  ├─ WebSocket Upgrade (HTTP→WS) ───►│
+  │                                  │
+  ├─ STOMP CONNECT                   │
+  │   header: Authorization: Bearer  │
+  │   <token> ───────────────────────►│
+  │                                  ├─ JwtChannelInterceptor.preSend()
+  │                                  │   - Đọc token từ header CONNECT
+  │                                  │   - Gọi JwtService.extractUsername()
+  │                                  │   - Nếu hợp lệ: gắn Principal vào session
+  │                                  │   - Nếu không hợp lệ: đóng kết nối
+  │◄─ STOMP CONNECTED ───────────────┤
+  │                                  ├─ PresenceEventListener.onConnect()
+  │                                  │   - addSession(sessionId, username)
+  │                                  │   - UPDATE status = ONLINE trong DB
+  │                                  │   - broadcast { onlineUsers:[...] }
+  │                                  │     tới /topic/presence
+  │                                  │
+  ├─ SUBSCRIBE /topic/presence ─────►│  (nhận danh sách user online)
+  ├─ SUBSCRIBE /user/queue/signal ──►│  (nhận signaling message)
+  │                                  │
+```
+
+`PresenceService` dùng `ConcurrentHashMap<sessionId, username>` để quản lý session. Một user mở nhiều tab vẫn được tính là online; chỉ khi **tất cả** tab đóng mới broadcast OFFLINE.
+
+### Giai đoạn 3 — Signaling WebRTC (relay qua server)
+
+```
+Alice (caller)           Server (relay only)           Bob (callee)
+  │                           │                            │
+  │ [click Call]              │                            │
+  ├─ SEND /app/signal ───────►│                            │
+  │   { type:"call-request",  │                            │
+  │     to:"bob", from:"alice"│  server overwrite "from"   │
+  │     (bị ignore) }         │  bằng Principal            │
+  │                           ├─ convertAndSendToUser ─────►│
+  │                           │   "bob", "/queue/signal"   │
+  │                           │   { type:"call-request",   │
+  │                           │     from:"alice" (đúng) }  │
+  │                           │                            │ [modal hiện]
+  │                           │◄─ SEND /app/signal ────────┤
+  │                           │   { type:"call-accepted",  │
+  │                           │     to:"alice" }           │
+  │◄─ /user/queue/signal ─────┤                            │
+  │                           │                            │
+  │  [trao đổi SDP offer/answer + ICE candidates tương tự] │
+  │                           │                            │
+  │◄══════════ WebRTC P2P — media stream trực tiếp ════════►│
+  │            (server KHÔNG tham gia vào media)           │
+```
+
+Server chỉ relay signal — không xử lý, không lưu, không decode payload. Field `from` luôn bị overwrite bằng `principal.getName()` từ JWT để tránh giả mạo danh tính.
+
+---
+
 ## Kiến trúc hệ thống
 
 ```
 Browser (React)
     │
     ├─ HTTP REST (JWT)──────────► Spring Boot
-    │                              ├── AuthController   /api/auth/*
-    │                              ├── UserController   /api/users/*
-    │                              ├── Spring Security  JwtAuthenticationFilter
-    │                              └── PostgreSQL       users table
+    │                              ├── AuthController      /api/auth/*
+    │                              ├── UserController      /api/users/*
+    │                              ├── JwtAuthFilter       (filter chain)
+    │                              ├── SecurityConfig      (permit/protect rules)
+    │                              └── PostgreSQL          users table
     │
     └─ WebSocket/STOMP ──────────► Spring Boot
-                                   ├── JwtChannelInterceptor  (auth CONNECT frame)
-                                   ├── PresenceEventListener  (online/offline events)
-                                   ├── PresenceService        (in-memory session map)
-                                   ├── SignalController       /app/signal → relay
-                                   └── Simple Message Broker
-                                       ├── /topic/presence    (broadcast)
-                                       └── /user/queue/signal (private queue)
+                                   ├── JwtChannelInterceptor   (auth CONNECT)
+                                   ├── PresenceEventListener   (connect/disconnect)
+                                   ├── PresenceService         (session registry)
+                                   ├── SignalController        /app/signal → relay
+                                   └── STOMP Message Broker
+                                       ├── /topic/presence     (broadcast tới tất cả)
+                                       └── /user/queue/signal  (private per-user)
 ```
 
-**WebRTC signaling flow:**
+**Hai kênh truyền tải song song:**
+- **REST** — Stateless, mỗi request mang JWT. Dùng cho auth và query dữ liệu.
+- **WebSocket/STOMP** — Persistent connection, xác thực 1 lần lúc CONNECT. Dùng cho presence realtime và signaling.
 
-```
-Alice                    Server (relay)                Bob
-  │                           │                          │
-  ├─ SDP offer → /app/signal ─►│                          │
-  │                           ├─ /user/queue/signal ──────►│
-  │                           │◄─ SDP answer ─────────────┤
-  │◄─ /user/queue/signal ──────┤                          │
-  │         (ICE candidates trao đổi tương tự)            │
-  │                           │                          │
-  │◄══════════ WebRTC P2P — media stream trực tiếp ══════►│
-  │                (server không tham gia vào media)      │
-```
+---
+
+## Những gì đã xây dựng
+
+### Phase 1 — Backend Foundation
+
+Xây dựng toàn bộ lớp backend: Spring Boot project (Maven), schema PostgreSQL qua Flyway migration, và REST API xác thực.
+
+**Flyway migration `V1__init_schema.sql`** tạo:
+- PostgreSQL custom type `user_status AS ENUM ('ONLINE', 'OFFLINE')`
+- Bảng `users` với các cột: `id`, `username` (unique), `password_hash` (BCrypt), `display_name`, `status`, `created_at`
+
+**Các endpoint hoạt động:**
+- `POST /api/auth/register` — tạo user, hash password BCrypt
+- `POST /api/auth/login` — xác thực, set ONLINE, trả JWT (HS256, sống 24h)
+- `POST /api/auth/logout` — set OFFLINE, client xóa token
+- `GET /api/users/me` — thông tin user hiện tại (protected)
+- `GET /api/users/online` — danh sách user đang online (protected)
+
+**Bảo mật:** `JwtAuthenticationFilter` intercept mọi request, extract username từ JWT, load `UserDetails`, set vào `SecurityContext`. Endpoint `/api/auth/**` được permit, còn lại yêu cầu JWT hợp lệ.
+
+**Test coverage:** 11 tests (8 AuthController + 3 Flyway migration) — tất cả GREEN.
+
+---
+
+### Phase 2 — WebSocket Infrastructure
+
+Xây dựng lớp realtime trên nền WebSocket: xác thực JWT cho STOMP, theo dõi presence, và relay signaling.
+
+**`WebSocketConfig`** — cấu hình STOMP broker:
+- Endpoint kết nối: `/ws` (native WebSocket, không SockJS)
+- Application prefix: `/app` (client gửi lên)
+- Broker prefix: `/topic`, `/queue` (server push xuống)
+- User destination prefix: `/user` (private per-user queue)
+
+**`JwtChannelInterceptor`** — bảo vệ STOMP CONNECT:
+- Tái sử dụng `JwtService` từ Phase 1 (không viết lại logic JWT)
+- Xác thực 1 lần tại frame CONNECT, gắn `Principal` vào session
+- Mọi frame sau đó tự động có danh tính — không phải check lại
+
+**`PresenceService` + `PresenceEventListener`**:
+- `ConcurrentHashMap<sessionId, username>` — thread-safe, hỗ trợ multi-tab
+- Khi connect: add session → UPDATE ONLINE → broadcast `/topic/presence`
+- Khi disconnect: remove session → chỉ UPDATE OFFLINE nếu không còn session nào → broadcast
+- Idempotent: duplicate disconnect event không gây flapping
+
+**`SignalController`**:
+- Nhận tại `/app/signal`, relay tới `/user/{to}/queue/signal`
+- Overwrite field `from` bằng `principal.getName()` — ngăn chặn spoofing danh tính
+
+**Test coverage:** 6 tests mới (WebSocket auth, presence broadcast, signal relay) + 11 Phase 1 không regression — tổng 17 tests GREEN.
+
+---
+
+### Phase 3 — React Auth + User List
+
+Xây dựng toàn bộ frontend: Vite + React 19 + TypeScript + Tailwind CSS + shadcn/ui.
+
+**State management bằng React Context:**
+- `AuthContext` — lưu JWT, username, trạng thái login; Axios interceptor tự đính kèm token
+- `WebSocketContext` — quản lý STOMP client lifecycle; reconnect khi mất kết nối
+- `CallContext` — stub cho Phase 4 (WebRTC state machine)
+
+**`AuthPage`** — tabbed Login/Register:
+- Validation inline, error message từ server
+- Sau login thành công: lưu token → connect WebSocket → navigate `/users`
+
+**`UserListPage`** — danh sách user online:
+- Subscribe `/topic/presence`, tự filter bản thân ra khỏi danh sách
+- Update realtime khi user khác join/leave — không cần polling
+- Nút "Call" cho mỗi user (wire tới Phase 4)
+- Logout flow: gọi `POST /api/auth/logout` → disconnect WebSocket → về trang login
+
+**Test coverage:** Vitest + React Testing Library, tất cả tests GREEN.
 
 ---
 
