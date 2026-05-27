@@ -1,5 +1,5 @@
-import { describe, it, vi, beforeEach, afterEach, expect, act } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CallPage from '@/pages/CallPage'
 

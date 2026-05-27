@@ -1,14 +1,15 @@
 // ──────────────────────────────────────────────────────────────────
-// CallPage — full UI per UI-SPEC §5.3
+// CallPage — full UI per UI-SPEC §5.3 (Phase 4) + §5 extensions (Phase 5)
 // Remote video full-screen, local PiP overlay, peer name overlay,
-// and hang-up control bar. Phase 5 adds mic/camera toggles, timer,
-// and connection status indicator.
+// timer overlay, connection status overlay, and 3-button control bar.
+// Phase 5 adds: Mic toggle, Camera toggle, useCallTimer, ICE status.
 // ──────────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Users, PhoneOff } from 'lucide-react'
+import { Users, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react'
 import { useCall } from '@/contexts/CallContext'
+import { useCallTimer } from '@/hooks/useCallTimer'
 
 // ──────────────────────────────────────────────────────────────────
 // Copy strings — UI-SPEC §8
@@ -16,17 +17,51 @@ import { useCall } from '@/contexts/CallContext'
 const COPY = {
   placeholderText: 'Waiting for remote video...',
   endCallLabel: 'End call',
+  muteMicLabel: 'Mute microphone',
+  unmuteMicLabel: 'Unmute microphone',
+  cameraOffLabel: 'Turn off camera',
+  cameraOnLabel: 'Turn on camera',
+  cameraUnavailableLabel: 'Camera unavailable',
 } as const
+
+// ──────────────────────────────────────────────────────────────────
+// ICE_STATUS — maps RTCIceConnectionState to status pill display info
+// D-08/D-09: 4 semantic states with colors per UI-SPEC §5.4
+// ──────────────────────────────────────────────────────────────────
+const ICE_STATUS: Record<string, { label: string; colorClass: string; pulse: boolean }> = {
+  new:          { label: '● Connecting...',  colorClass: 'text-amber-400',   pulse: false },
+  checking:     { label: '● Connecting...',  colorClass: 'text-amber-400',   pulse: false },
+  connected:    { label: '● Connected',      colorClass: 'text-emerald-400', pulse: false },
+  completed:    { label: '● Connected',      colorClass: 'text-emerald-400', pulse: false },
+  disconnected: { label: '● Reconnecting...', colorClass: 'text-amber-400',  pulse: true  },
+  failed:       { label: '● Failed',         colorClass: 'text-red-400',     pulse: false },
+  closed:       { label: '● Failed',         colorClass: 'text-red-400',     pulse: false },
+}
 
 // ──────────────────────────────────────────────────────────────────
 // CallPage
 // ──────────────────────────────────────────────────────────────────
 export default function CallPage() {
-  const { localStream, remoteStream, peerUsername, callStatus, hangUp } = useCall()
+  const {
+    localStream,
+    remoteStream,
+    peerUsername,
+    callStatus,
+    hangUp,
+    isMuted,
+    isCameraOff,
+    iceState,
+    toggleMute,
+    toggleCamera,
+  } = useCall()
   const navigate = useNavigate()
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
+
+  const timerDisplay = useCallTimer(callStatus)
+  const hasVideoTracks = (localStream?.getVideoTracks().length ?? 0) > 0
+  const statusInfo = iceState ? (ICE_STATUS[iceState] ?? ICE_STATUS.new) : ICE_STATUS.new
 
   // Pitfall 3: NEVER set srcObject as a JSX prop — always via useEffect.
   // Setting srcObject as a prop causes React to reset it on every re-render.
@@ -44,6 +79,14 @@ export default function CallPage() {
       navigate('/users', { replace: true })
     }
   }, [callStatus, navigate])
+
+  // Pitfall 5: stop media tracks if user navigates away via browser back button
+  useEffect(() => {
+    return () => {
+      if (callStatus !== 'idle') hangUp()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="relative w-full h-screen bg-slate-950 overflow-hidden">
@@ -72,6 +115,22 @@ export default function CallPage() {
         </div>
       )}
 
+      {/* Timer + status overlay — top-center, above remote video (UI-SPEC §5.3, D-02) */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none">
+        {/* Timer pill — D-05/D-06/D-07 */}
+        <div className="bg-slate-900/70 backdrop-blur-sm rounded-lg px-3 py-1">
+          <span className="text-sm font-semibold text-slate-50 tabular-nums">{timerDisplay}</span>
+        </div>
+        {/* Status pill — D-08/D-09; role=status aria-live=polite per UI-SPEC §9 */}
+        <div
+          className={`bg-slate-900/70 backdrop-blur-sm rounded-lg px-3 py-1${statusInfo.pulse ? ' animate-pulse' : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className={`text-xs font-normal ${statusInfo.colorClass}`}>{statusInfo.label}</span>
+        </div>
+      </div>
+
       {/* Local video PiP — bottom-right, above control bar (UI-SPEC §5.3) */}
       <div className="absolute bottom-24 right-4 w-32 aspect-video bg-slate-800 rounded-lg overflow-hidden border border-slate-700 shadow-lg animate-in fade-in zoom-in-90 duration-200">
         <video
@@ -84,14 +143,37 @@ export default function CallPage() {
         />
       </div>
 
-      {/* Control bar — hang-up only in Phase 4. Mic/camera/timer added in Phase 5. */}
+      {/* Control bar — 3-button row: Mic (left) | End Call (center) | Camera (right) */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-slate-900/90 backdrop-blur-sm border-t border-slate-700 flex items-center justify-center gap-4">
+        {/* Mic toggle button — D-03 */}
+        <Button
+          className={`h-10 w-10 rounded-full text-white transition-colors duration-150 ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+          aria-label={isMuted ? COPY.unmuteMicLabel : COPY.muteMicLabel}
+          aria-pressed={isMuted}
+          onClick={toggleMute}
+        >
+          {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+        </Button>
+
+        {/* End Call button — inherited from Phase 4, center anchor */}
         <Button
           className="h-12 w-12 rounded-full bg-red-600 hover:bg-red-700 text-white"
           aria-label={COPY.endCallLabel}
           onClick={hangUp}
         >
           <PhoneOff className="size-5" />
+        </Button>
+
+        {/* Camera toggle button — D-04, D-12 */}
+        <Button
+          className={`h-10 w-10 rounded-full text-white transition-colors duration-150 ${!hasVideoTracks ? 'bg-slate-700 opacity-50 cursor-not-allowed' : isCameraOff ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+          aria-label={!hasVideoTracks ? COPY.cameraUnavailableLabel : isCameraOff ? COPY.cameraOnLabel : COPY.cameraOffLabel}
+          aria-pressed={isCameraOff}
+          aria-disabled={!hasVideoTracks}
+          disabled={!hasVideoTracks}
+          onClick={toggleCamera}
+        >
+          {isCameraOff || !hasVideoTracks ? <VideoOff className="size-4" /> : <Video className="size-4" />}
         </Button>
       </div>
 

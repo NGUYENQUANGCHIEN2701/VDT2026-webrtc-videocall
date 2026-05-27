@@ -19,6 +19,7 @@ const COPY = {
   callButton: 'Call',
   callingButton: 'Calling...',
   callingAriaLabel: (u: string) => `Calling ${u}...`,
+  cancelButton: 'Cancel',
   logoutButton: 'Logout',
   emptyHeading: 'No one else is online',
   emptyBody: 'Share the app link with a friend to start a call.',
@@ -33,11 +34,13 @@ function UserRow({
   callStatus,
   peerUsername,
   onCall,
+  onCancel,
 }: {
   user: string
   callStatus: string
   peerUsername: string | null
   onCall: (username: string) => void
+  onCancel?: () => void
 }) {
   const isCallActive = callStatus !== 'idle'
   const isCallingThisUser = callStatus === 'calling' && peerUsername === user
@@ -55,15 +58,26 @@ function UserRow({
       <span className="flex-1" />
       <span className="text-xs font-normal text-emerald-400">{COPY.onlineBadge}</span>
       {isCallingThisUser ? (
-        <Button
-          size="sm"
-          disabled
-          className="bg-slate-700 text-emerald-400 cursor-not-allowed h-8"
-          aria-label={COPY.callingAriaLabel(user)}
-        >
-          <Loader2 className="animate-spin size-4 mr-2" />
-          {COPY.callingButton}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            disabled
+            className="bg-slate-700 text-emerald-400 cursor-not-allowed h-8"
+            aria-label={COPY.callingAriaLabel(user)}
+          >
+            <Loader2 className="animate-spin size-4 mr-2" />
+            {COPY.callingButton}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-400 hover:text-red-300"
+            aria-label="Cancel call"
+            onClick={onCancel}
+          >
+            {COPY.cancelButton}
+          </Button>
+        </div>
       ) : (
         <Button
           size="sm"
@@ -86,7 +100,7 @@ function UserRow({
 export default function UserListPage() {
   const { username, dispatch } = useAuth()
   const { onlineUsers, isLoading, isConnected, disconnect } = useWebSocket()
-  const { callStatus, peerUsername, startCall } = useCall()
+  const { callStatus, peerUsername, startCall, hangUp } = useCall()
   const navigate = useNavigate()
 
   // Self-filter — RESEARCH Pitfall 4 / UI-SPEC §6
@@ -181,6 +195,7 @@ export default function UserListPage() {
                   callStatus={callStatus}
                   peerUsername={peerUsername}
                   onCall={startCall}
+                  onCancel={hangUp}
                 />
               ))}
             </ul>
