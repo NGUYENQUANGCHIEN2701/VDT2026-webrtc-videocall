@@ -85,7 +85,7 @@ function UserRow({
 // ──────────────────────────────────────────────────────────────────
 export default function UserListPage() {
   const { username, dispatch } = useAuth()
-  const { onlineUsers, isLoading, disconnect } = useWebSocket()
+  const { onlineUsers, isLoading, isConnected, disconnect } = useWebSocket()
   const { callStatus, peerUsername, startCall } = useCall()
   const navigate = useNavigate()
 
@@ -125,6 +125,13 @@ export default function UserListPage() {
           </div>
         </div>
       </header>
+
+      {/* ── Reconnecting banner ── */}
+      {!isConnected && (
+        <div className="bg-amber-900/40 border-b border-amber-600/40 text-amber-400 text-sm text-center py-2">
+          Reconnecting to server...
+        </div>
+      )}
 
       {/* ── Content — UI-SPEC §6 ── */}
       <main className="mx-auto max-w-2xl px-4 py-6">

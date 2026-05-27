@@ -5,6 +5,7 @@
 // and connection status indicator.
 // ──────────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Users, PhoneOff } from 'lucide-react'
 import { useCall } from '@/contexts/CallContext'
@@ -21,7 +22,8 @@ const COPY = {
 // CallPage
 // ──────────────────────────────────────────────────────────────────
 export default function CallPage() {
-  const { localStream, remoteStream, peerUsername, hangUp } = useCall()
+  const { localStream, remoteStream, peerUsername, callStatus, hangUp } = useCall()
+  const navigate = useNavigate()
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -36,9 +38,12 @@ export default function CallPage() {
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
   }, [remoteStream])
 
-  // Phase 4: deliberately no unmount cleanup — see RESEARCH.md Pitfall 4 / Phase 5 TODO.
-  // Navigating away from /call leaves call state intact so user can navigate back.
-  // Phase 5 will add proper unmount handling if needed.
+  // Navigate back to user list when call ends (hangUp, remote hang-up, or connection lost)
+  useEffect(() => {
+    if (callStatus === 'idle') {
+      navigate('/users', { replace: true })
+    }
+  }, [callStatus, navigate])
 
   return (
     <div className="relative w-full h-screen bg-slate-950 overflow-hidden">

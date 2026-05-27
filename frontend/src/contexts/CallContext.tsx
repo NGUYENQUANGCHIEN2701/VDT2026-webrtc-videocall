@@ -330,6 +330,26 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [client, subscribe, handleSignal])
 
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  /**
+   * Try video+audio, fall back to audio-only if no camera device found.
+   * Returns null if even audio-only fails (e.g. no devices at all).
+   */
+  const getLocalStream = useCallback(async (): Promise<MediaStream | null> => {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    } catch {
+      try {
+        addToast('No camera found — audio only', 'bg-slate-800 border border-amber-600/40 text-amber-400')
+        return await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+      } catch {
+        addToast('Cannot access microphone', 'bg-slate-800 border border-red-600/40 text-red-400')
+        return null
+      }
+    }
+  }, [addToast])
+
   // ── Public actions ───────────────────────────────────────────────
 
   /**
@@ -345,8 +365,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     peerUsernameRef.current = targetUsername
     setCallStatus('calling')
 
-    // Acquire local media
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    // Acquire local media (with audio-only fallback if no camera)
+    const stream = await getLocalStream()
+    if (!stream) {
+      teardown()
+      return
+    }
     localStreamRef.current = stream
     setLocalStream(stream)
 
@@ -374,8 +398,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const acceptCall = async (): Promise<void> => {
     const target = peerUsernameRef.current!
 
-    // Acquire local media
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    // Acquire local media (with audio-only fallback if no camera)
+    const stream = await getLocalStream()
+    if (!stream) {
+      rejectCall()
+      return
+    }
     localStreamRef.current = stream
     setLocalStream(stream)
 
