@@ -1,8 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useWebSocket } from '@/contexts/WebSocketContext'
-import { useAuth } from '@/contexts/AuthContext'
-import type { IMessage } from '@stomp/stompjs'
+import { createContext, useContext, useState, type ReactNode } from 'react'
 
 // ──────────────────────────────────────────────────────────────────
 // Types (D-02, D-03) — exported so downstream plans can import
@@ -38,54 +34,37 @@ const CallContext = createContext<CallContextValue | null>(null)
 // WebSocketProvider and AuthProvider so it can call useWebSocket()
 // and useAuth(). It also calls useNavigate() (works because
 // BrowserRouter is outermost per D-04).
+//
+// Plan 02 will:
+//   - Add imports: useEffect, useRef, useNavigate, useWebSocket, useAuth, IMessage
+//   - Replace useState constants with useState + setters
+//   - Add useRef declarations for pcRef, localStreamRef, peerUsernameRef,
+//     iceCandidateBufferRef, remoteDescSetRef, teardownTimerRef, callTimeoutRef
+//   - Implement startCall, acceptCall, rejectCall, hangUp with real WebRTC logic
+//   - Add STOMP signal subscription in a useEffect watching client connectivity
 // ──────────────────────────────────────────────────────────────────
 export function CallProvider({ children }: { children: ReactNode }) {
-  const [callStatus, setCallStatus] = useState<CallStatus>('idle')
-  const [peerUsername, setPeerUsername] = useState<string | null>(null)
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null)
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
-  const [toasts, setToasts] = useState<Toast[]>([])
+  const [callStatus] = useState<CallStatus>('idle')
+  const [peerUsername] = useState<string | null>(null)
+  const [localStream] = useState<MediaStream | null>(null)
+  const [remoteStream] = useState<MediaStream | null>(null)
+  const [toasts] = useState<Toast[]>([])
 
-  // Refs for mutable objects that must NOT trigger re-renders (Plan 02 will use these)
-  const pcRef = useRef<RTCPeerConnection | null>(null)
-  const localStreamRef = useRef<MediaStream | null>(null)
-  const peerUsernameRef = useRef<string | null>(null)
-  const iceCandidateBufferRef = useRef<RTCIceCandidate[]>([])
-  const remoteDescSetRef = useRef(false)
-  const teardownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Hooks — imports ready for Plan 02 to use
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { client, subscribe, publish } = useWebSocket()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { username } = useAuth()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const navigate = useNavigate()
-
-  // Suppress unused ref warnings in stub — Plan 02 will use all refs
-  void pcRef; void localStreamRef; void peerUsernameRef
-  void iceCandidateBufferRef; void remoteDescSetRef
-  void teardownTimerRef; void callTimeoutRef
-
-  // Suppress unused IMessage — Plan 02 will use it in signal handler
-  void (null as unknown as IMessage)
-
-  // Stub no-op functions — Plan 02 replaces these bodies
+  // Stub no-op functions — Plan 02 replaces these bodies with real WebRTC logic
   const startCall = async (_targetUsername: string): Promise<void> => {
-    // Plan 02 implements: getUserMedia, create RTCPeerConnection, create offer, publish call-request
+    // Plan 02: self-call guard, getUserMedia, RTCPeerConnection, offer, publish call-request
   }
 
   const acceptCall = async (): Promise<void> => {
-    // Plan 02 implements: getUserMedia, create answer, navigate to /call
+    // Plan 02: getUserMedia, answer, navigate('/call')
   }
 
   const rejectCall = (): void => {
-    // Plan 02 implements: publish call-decline, reset state
+    // Plan 02: publish call-decline signal, reset to idle
   }
 
   const hangUp = (): void => {
-    // Plan 02 implements: publish call-end, teardown, reset state
+    // Plan 02: publish call-end signal, teardown, reset state
   }
 
   return (

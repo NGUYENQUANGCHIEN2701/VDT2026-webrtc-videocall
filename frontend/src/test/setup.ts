@@ -34,14 +34,12 @@ const mockTrack = { stop: vi.fn() }
 const mockMediaStream = {
   getTracks: vi.fn().mockReturnValue([mockTrack]),
 }
-Object.defineProperty(global, 'navigator', {
-  value: {
-    ...global.navigator,
-    mediaDevices: {
-      getUserMedia: vi.fn().mockResolvedValue(mockMediaStream),
-    },
+
+vi.stubGlobal('navigator', {
+  ...globalThis.navigator,
+  mediaDevices: {
+    getUserMedia: vi.fn().mockResolvedValue(mockMediaStream),
   },
-  writable: true,
 })
 
 afterEach(() => {
