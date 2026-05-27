@@ -18,6 +18,14 @@ const mockDisconnect = vi.fn().mockResolvedValue(undefined)
 let mockUsername: string | null = 'alice'
 const mockDispatch = vi.fn()
 
+// CallContext mocks
+let mockCallStatus: string = 'idle'
+let mockPeerUsername: string | null = null
+const mockStartCall = vi.fn()
+const mockAcceptCall = vi.fn()
+const mockRejectCall = vi.fn()
+const mockHangUp = vi.fn()
+
 // Mock useNavigate from react-router-dom
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -50,6 +58,21 @@ vi.mock('@/contexts/AuthContext', () => ({
   }),
 }))
 
+// Mock CallContext
+vi.mock('@/contexts/CallContext', () => ({
+  useCall: () => ({
+    callStatus: mockCallStatus,
+    peerUsername: mockPeerUsername,
+    startCall: mockStartCall,
+    acceptCall: mockAcceptCall,
+    rejectCall: mockRejectCall,
+    hangUp: mockHangUp,
+    localStream: null,
+    remoteStream: null,
+    toasts: [],
+  }),
+}))
+
 function renderUserListPage() {
   return render(
     <MemoryRouter initialEntries={['/users']}>
@@ -64,10 +87,16 @@ afterEach(() => {
   mockNavigate.mockClear()
   mockDisconnect.mockClear()
   mockDispatch.mockClear()
+  mockStartCall.mockClear()
+  mockAcceptCall.mockClear()
+  mockRejectCall.mockClear()
+  mockHangUp.mockClear()
   // Reset to defaults
   mockOnlineUsers = []
   mockIsLoading = false
   mockUsername = 'alice'
+  mockCallStatus = 'idle'
+  mockPeerUsername = null
 })
 afterAll(() => server.close())
 
@@ -183,5 +212,39 @@ describe('UserListPage', () => {
     expect(mockDisconnect).toHaveBeenCalledTimes(1)
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'LOGOUT' })
     expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true })
+  })
+
+  it('CALL-01: clicking Call button invokes startCall with the target username', async () => {
+    mockOnlineUsers = ['bob']
+    mockCallStatus = 'idle'
+
+    const user = userEvent.setup()
+    renderUserListPage()
+
+    await user.click(screen.getByRole('button', { name: 'Call bob' }))
+
+    expect(mockStartCall).toHaveBeenCalledWith('bob')
+  })
+
+  it('UI-SPEC §5.2: shows "Calling..." disabled button on target user during outgoing call', () => {
+    mockOnlineUsers = ['bob']
+    mockCallStatus = 'calling'
+    mockPeerUsername = 'bob'
+
+    renderUserListPage()
+
+    const callingBtn = screen.getByRole('button', { name: /Calling bob\.\.\./i })
+    expect(callingBtn).toBeDisabled()
+    expect(callingBtn).toHaveTextContent('Calling...')
+  })
+
+  it('UI-SPEC §5.2: disables Call buttons for other users while a call is in flight', () => {
+    mockOnlineUsers = ['bob', 'carol']
+    mockCallStatus = 'calling'
+    mockPeerUsername = 'bob'
+
+    renderUserListPage()
+
+    expect(screen.getByRole('button', { name: 'Call carol' })).toBeDisabled()
   })
 })
