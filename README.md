@@ -14,15 +14,14 @@
 - **Signaling relay** — Server chuyển tiếp SDP offer/answer và ICE candidates giữa các peer qua STOMP
 - **Giao diện đăng nhập / đăng ký** — Tabbed UI, validation, error handling
 - **Giao diện danh sách người dùng** — Live presence rows, self-filter, empty state, logout
+- **1-1 Video Call** — WebRTC P2P, incoming call modal, accept/reject, ringtone (Web Audio API), 30s timeout, ICE recovery
 
 ### Đang triển khai
 
-- **1-1 Video Call** — WebRTC P2P connection, incoming call modal, accept/reject, ringtone, 30s timeout *(Phase 4 — đang xử lý)*
+- **Call Controls** — Mute mic, toggle camera, duration timer, connection status indicator *(Phase 5 — đang xử lý)*
 
 ### Kế hoạch tiếp theo
-
-- **Call Controls** — Mute mic, toggle camera, end call, duration timer, connection status *(Phase 5)*
-- **Screen Sharing** — Chia sẻ màn hình trong cuộc gọi bằng `getDisplayMedia()` *(Phase 6)*
+- **Screen Sharing** — Chia sẻ màn hình bằng `getDisplayMedia()` *(Phase 6)*
 - **Group Call (Mesh)** — Gọi nhóm 3–5 người, kiến trúc mesh P2P *(Phase 7)*
 - **Recording** — Ghi lại cuộc gọi bằng `MediaRecorder API`, download `.webm` *(Phase 8)*
 - **Docker Compose** — Chạy toàn bộ stack bằng một lệnh *(Phase 8)*
@@ -234,7 +233,6 @@ Xây dựng toàn bộ frontend: Vite + React 19 + TypeScript + Tailwind CSS + s
 **State management bằng React Context:**
 - `AuthContext` — lưu JWT, username, trạng thái login; Axios interceptor tự đính kèm token
 - `WebSocketContext` — quản lý STOMP client lifecycle; reconnect khi mất kết nối
-- `CallContext` — stub cho Phase 4 (WebRTC state machine)
 
 **`AuthPage`** — tabbed Login/Register:
 - Validation inline, error message từ server
@@ -243,10 +241,35 @@ Xây dựng toàn bộ frontend: Vite + React 19 + TypeScript + Tailwind CSS + s
 **`UserListPage`** — danh sách user online:
 - Subscribe `/topic/presence`, tự filter bản thân ra khỏi danh sách
 - Update realtime khi user khác join/leave — không cần polling
-- Nút "Call" cho mỗi user (wire tới Phase 4)
+- Nút "Call" cho mỗi user
 - Logout flow: gọi `POST /api/auth/logout` → disconnect WebSocket → về trang login
 
 **Test coverage:** Vitest + React Testing Library, tất cả tests GREEN.
+
+---
+
+### Phase 4 — 1-1 Call Core
+
+Xây dựng toàn bộ luồng gọi video 1-1 end-to-end trên frontend sử dụng WebRTC P2P.
+
+**`CallContext`** — WebRTC state machine:
+- `callStatus: 'idle' | 'calling' | 'ringing' | 'connected' | 'ended'` điều khiển toàn bộ UI
+- Subscribe `/user/queue/signal`, dispatch theo type: `call-request`, `call-accept`, `call-decline`, `call-end`, `offer`, `answer`, `ice-candidate`
+- ICE candidate buffering — buffer candidates nhận trước khi `setRemoteDescription()` xong
+- 30s timeout cho cuộc gọi không có ai trả lời (CALL-07): caller tự cancel + gửi `call-end`
+- ICE disconnection recovery: grace window 2s cho `'disconnected'`, teardown ngay khi `'failed'`
+- Audio-only fallback: nếu không có camera, tự động fallback sang `{ video: false, audio: true }`
+
+**`IncomingCallModal`** — overlay toàn màn hình khi `callStatus === 'ringing'`:
+- Hiển thị tên caller, Avatar, nút Accept / Reject
+- Ringtone synthesized bằng Web Audio API (800Hz sine wave, không cần file audio)
+
+**`CallPage`** — màn hình video call:
+- Remote video full-screen, local video PiP (bottom-right, mirrored)
+- Peer name overlay top-left
+- Hang-up button (Phase 5 thêm mic/camera toggles, timer, connection status)
+
+**Test coverage:** Vitest + React Testing Library với RTCPeerConnection mock, tất cả tests GREEN.
 
 ---
 
@@ -437,8 +460,8 @@ npm test
 | 1 | Backend Foundation (REST + JWT + DB) | Hoàn thành |
 | 2 | WebSocket Infrastructure (STOMP + Presence + Signaling) | Hoàn thành |
 | 3 | React Auth + User List UI | Hoàn thành |
-| 4 | 1-1 Video Call Core (WebRTC P2P) | **Đang xử lý** |
-| 5 | Call Controls (mute, camera, timer) | Chưa bắt đầu |
+| 4 | 1-1 Video Call Core (WebRTC P2P) | Hoàn thành |
+| 5 | Call Controls (mute, camera, timer) | **Đang xử lý** |
 | 6 | Screen Sharing | Chưa bắt đầu |
 | 7 | Group Call Mesh (3–5 người) | Chưa bắt đầu |
 | 8 | Recording + Docker Compose + Docs | Chưa bắt đầu |
