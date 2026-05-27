@@ -1,4 +1,4 @@
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { describe, it, vi, beforeEach, afterEach, expect, act } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CallPage from '@/pages/CallPage'
@@ -7,14 +7,20 @@ import CallPage from '@/pages/CallPage'
 // Mutable mock values — mutated per test case
 // ──────────────────────────────────────────────────────────────────
 const mockHangUp = vi.fn()
+const mockToggleMute = vi.fn()
+const mockToggleCamera = vi.fn()
 let mockLocalStream: MediaStream | null = null
 let mockRemoteStream: MediaStream | null = null
 let mockPeerUsername: string | null = 'bob'
+let mockIsMuted = false
+let mockIsCameraOff = false
+let mockIceState: RTCIceConnectionState | null = null
+let mockCallStatus = 'connected'
 
 // Mock CallContext — provides mutable values via closure
 vi.mock('@/contexts/CallContext', () => ({
   useCall: () => ({
-    callStatus: 'connected',
+    callStatus: mockCallStatus,
     peerUsername: mockPeerUsername,
     localStream: mockLocalStream,
     remoteStream: mockRemoteStream,
@@ -23,6 +29,11 @@ vi.mock('@/contexts/CallContext', () => ({
     acceptCall: vi.fn().mockResolvedValue(undefined),
     rejectCall: vi.fn(),
     hangUp: mockHangUp,
+    isMuted: mockIsMuted,
+    isCameraOff: mockIsCameraOff,
+    iceState: mockIceState,
+    toggleMute: mockToggleMute,
+    toggleCamera: mockToggleCamera,
   }),
 }))
 
@@ -41,9 +52,19 @@ describe('CallPage', () => {
 
   beforeEach(() => {
     mockHangUp.mockClear()
+    mockToggleMute.mockClear()
+    mockToggleCamera.mockClear()
     mockLocalStream = null
     mockRemoteStream = null
     mockPeerUsername = 'bob'
+    mockIsMuted = false
+    mockIsCameraOff = false
+    mockIceState = null
+    mockCallStatus = 'connected'
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   // UI-03: remote video element
@@ -114,6 +135,99 @@ describe('CallPage', () => {
     )
 
     expect(remoteVideo.srcObject).toBe(fakeStream)
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // Phase 5 — CTRL-01 through CTRL-05 tests (Plan 02)
+  // ──────────────────────────────────────────────────────────────────
+
+  // 05-02-01: CTRL-01 — mic button aria-label when active
+  it('05-02-01: CTRL-01 — mic button has aria-label="Mute microphone" when isMuted=false', () => {
+    mockIsMuted = false
+    renderCallPage()
+    const micButton = screen.getByRole('button', { name: 'Mute microphone' })
+    expect(micButton).toBeInTheDocument()
+  })
+
+  // 05-02-02: CTRL-01 — mic button aria-label when muted
+  it('05-02-02: CTRL-01 — mic button has aria-label="Unmute microphone" when isMuted=true', () => {
+    mockIsMuted = true
+    renderCallPage()
+    const micButton = screen.getByRole('button', { name: 'Unmute microphone' })
+    expect(micButton).toBeInTheDocument()
+  })
+
+  // 05-02-03: CTRL-01 — clicking mic button calls toggleMute
+  it('05-02-03: CTRL-01 — clicking mic button calls mockToggleMute once', () => {
+    mockIsMuted = false
+    renderCallPage()
+    const micButton = screen.getByRole('button', { name: 'Mute microphone' })
+    fireEvent.click(micButton)
+    expect(mockToggleMute).toHaveBeenCalledTimes(1)
+  })
+
+  // 05-02-04: CTRL-02 — camera button aria-label when active and stream has video tracks
+  it('05-02-04: CTRL-02 — camera button has aria-label="Turn off camera" when isCameraOff=false and stream has video tracks', () => {
+    mockIsCameraOff = false
+    mockLocalStream = { getVideoTracks: () => [{ enabled: true }], getTracks: () => [] } as unknown as MediaStream
+    renderCallPage()
+    const cameraButton = screen.getByRole('button', { name: 'Turn off camera' })
+    expect(cameraButton).toBeInTheDocument()
+  })
+
+  // 05-02-05: CTRL-02 — camera button disabled when no video tracks
+  it('05-02-05: CTRL-02 — camera button has aria-label="Camera unavailable" and is disabled when stream has no video tracks', () => {
+    mockLocalStream = { getVideoTracks: () => [], getTracks: () => [] } as unknown as MediaStream
+    renderCallPage()
+    const cameraButton = screen.getByRole('button', { name: 'Camera unavailable' })
+    expect(cameraButton).toBeInTheDocument()
+    expect(cameraButton).toBeDisabled()
+  })
+
+  // 05-02-06: CTRL-04 — timer shows "00:00" when callStatus is not 'connected'
+  it('05-02-06: CTRL-04 — timer shows "00:00" when callStatus="calling"', () => {
+    mockCallStatus = 'calling'
+    renderCallPage()
+    expect(screen.getByText('00:00')).toBeInTheDocument()
+  })
+
+  // 05-02-07: CTRL-04 — timer increments when connected
+  it('05-02-07: CTRL-04 — timer increments to "00:03" after advancing fake timers 3s when callStatus="connected"', async () => {
+    vi.useFakeTimers()
+    mockCallStatus = 'connected'
+    renderCallPage()
+    await act(async () => {
+      vi.advanceTimersByTime(3000)
+    })
+    expect(screen.getByText('00:03')).toBeInTheDocument()
+  })
+
+  // 05-02-08: CTRL-05 — status pill shows Connecting when iceState is null
+  it('05-02-08: CTRL-05 — status pill contains "● Connecting..." when iceState=null', () => {
+    mockIceState = null
+    renderCallPage()
+    expect(screen.getByText('● Connecting...')).toBeInTheDocument()
+  })
+
+  // 05-02-09: CTRL-05 — status pill shows Connected
+  it('05-02-09: CTRL-05 — status pill contains "● Connected" when iceState="connected"', () => {
+    mockIceState = 'connected'
+    renderCallPage()
+    expect(screen.getByText('● Connected')).toBeInTheDocument()
+  })
+
+  // 05-02-10: CTRL-05 — status pill shows Reconnecting
+  it('05-02-10: CTRL-05 — status pill contains "● Reconnecting..." when iceState="disconnected"', () => {
+    mockIceState = 'disconnected'
+    renderCallPage()
+    expect(screen.getByText('● Reconnecting...')).toBeInTheDocument()
+  })
+
+  // 05-02-11: CTRL-05 — status pill has correct ARIA attributes
+  it('05-02-11: CTRL-05 — status pill has role="status" and aria-live="polite"', () => {
+    renderCallPage()
+    const statusPill = screen.getByRole('status')
+    expect(statusPill).toHaveAttribute('aria-live', 'polite')
   })
 
 })
