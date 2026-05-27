@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { CallProvider, useCall } from '@/contexts/CallContext'
+import { mockAudioTrack, mockVideoTrack } from './setup'
 
 // ──────────────────────────────────────────────────────────────────
 // Mutable mock values — mutated per test case
@@ -509,6 +510,259 @@ describe('CallContext', () => {
 
     await waitFor(() => {
       expect(result.current.toasts.some((t) => t.message === 'Call ended')).toBe(true)
+    })
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // CTRL-01: mic mute toggle
+  // ──────────────────────────────────────────────────────────────────
+  it('CTRL-01a: toggleMute sets isMuted to true', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    expect(result.current.isMuted).toBe(false)
+
+    act(() => {
+      result.current.toggleMute()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isMuted).toBe(true)
+    })
+  })
+
+  it('CTRL-01b: toggleMute sets audioTrack.enabled to false', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    // Reset enabled to true before test
+    mockAudioTrack.enabled = true
+
+    act(() => {
+      result.current.toggleMute()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isMuted).toBe(true)
+    })
+
+    expect(mockAudioTrack.enabled).toBe(false)
+  })
+
+  it('CTRL-01c: toggleMute twice returns isMuted to false and audioTrack.enabled to true', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    // Reset enabled to true before test
+    mockAudioTrack.enabled = true
+
+    act(() => {
+      result.current.toggleMute()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isMuted).toBe(true)
+    })
+
+    act(() => {
+      result.current.toggleMute()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isMuted).toBe(false)
+    })
+
+    expect(mockAudioTrack.enabled).toBe(true)
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // CTRL-02: camera toggle
+  // ──────────────────────────────────────────────────────────────────
+  it('CTRL-02a: toggleCamera sets isCameraOff to true', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    expect(result.current.isCameraOff).toBe(false)
+
+    act(() => {
+      result.current.toggleCamera()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isCameraOff).toBe(true)
+    })
+  })
+
+  it('CTRL-02b: toggleCamera sets videoTrack.enabled to false', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    // Reset enabled to true before test
+    mockVideoTrack.enabled = true
+
+    act(() => {
+      result.current.toggleCamera()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isCameraOff).toBe(true)
+    })
+
+    expect(mockVideoTrack.enabled).toBe(false)
+  })
+
+  it('CTRL-02c: toggleCamera is a no-op when localStream has no video tracks', async () => {
+    // Override getUserMedia to return audio-only stream for this test
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce({
+      getTracks: vi.fn().mockReturnValue([mockAudioTrack]),
+      getAudioTracks: vi.fn().mockReturnValue([mockAudioTrack]),
+      getVideoTracks: vi.fn().mockReturnValue([]),
+    } as unknown as MediaStream)
+
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    expect(result.current.isCameraOff).toBe(false)
+
+    act(() => {
+      result.current.toggleCamera()
+    })
+
+    // isCameraOff should remain false — no video tracks, so no-op
+    await waitFor(() => {
+      expect(result.current.isCameraOff).toBe(false)
+    })
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // CTRL-03: teardown resets isMuted, isCameraOff, iceState
+  // ──────────────────────────────────────────────────────────────────
+  it('CTRL-03: teardown resets isMuted, isCameraOff, iceState to initial values', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    await waitFor(() => {
+      expect(mockSubscribe).toHaveBeenCalledWith('/user/queue/signal', expect.any(Function))
+    })
+
+    // Toggle mute and camera
+    act(() => {
+      result.current.toggleMute()
+      result.current.toggleCamera()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isMuted).toBe(true)
+      expect(result.current.isCameraOff).toBe(true)
+    })
+
+    // Fire ICE handler to set iceState
+    const MockPC = globalThis.RTCPeerConnection as unknown as {
+      lastInstance?: {
+        iceConnectionState: string
+        oniceconnectionstatechange: (() => void) | null
+      }
+    }
+
+    if (MockPC.lastInstance) {
+      MockPC.lastInstance.iceConnectionState = 'connected'
+      act(() => {
+        MockPC.lastInstance!.oniceconnectionstatechange?.()
+      })
+    }
+
+    await waitFor(() => {
+      expect(result.current.iceState).toBe('connected')
+    })
+
+    // Now hang up — triggers teardown
+    act(() => {
+      result.current.hangUp()
+    })
+
+    await waitFor(() => {
+      expect(result.current.callStatus).toBe('idle')
+      expect(result.current.isMuted).toBe(false)
+      expect(result.current.isCameraOff).toBe(false)
+      expect(result.current.iceState).toBeNull()
+    })
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // CTRL-05: iceState tracking via oniceconnectionstatechange
+  // ──────────────────────────────────────────────────────────────────
+  it('CTRL-05: iceState set on ICE state change to "connected"', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    expect(result.current.iceState).toBeNull()
+
+    const MockPC = globalThis.RTCPeerConnection as unknown as {
+      lastInstance?: {
+        iceConnectionState: string
+        oniceconnectionstatechange: (() => void) | null
+      }
+    }
+
+    if (MockPC.lastInstance) {
+      MockPC.lastInstance.iceConnectionState = 'connected'
+      act(() => {
+        MockPC.lastInstance!.oniceconnectionstatechange?.()
+      })
+    }
+
+    await waitFor(() => {
+      expect(result.current.iceState).toBe('connected')
+    })
+  })
+
+  it('CTRL-05b: iceState set to "checking" on ICE state change', async () => {
+    const { result } = renderHook(() => useCall(), { wrapper })
+
+    await act(async () => {
+      await result.current.startCall('bob')
+    })
+
+    const MockPC = globalThis.RTCPeerConnection as unknown as {
+      lastInstance?: {
+        iceConnectionState: string
+        oniceconnectionstatechange: (() => void) | null
+      }
+    }
+
+    if (MockPC.lastInstance) {
+      MockPC.lastInstance.iceConnectionState = 'checking'
+      act(() => {
+        MockPC.lastInstance!.oniceconnectionstatechange?.()
+      })
+    }
+
+    await waitFor(() => {
+      expect(result.current.iceState).toBe('checking')
     })
   })
 

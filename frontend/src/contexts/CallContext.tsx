@@ -33,6 +33,11 @@ export interface CallContextValue {
   acceptCall: () => Promise<void>
   rejectCall: () => void
   hangUp: () => void
+  isMuted: boolean
+  isCameraOff: boolean
+  iceState: RTCIceConnectionState | null
+  toggleMute: () => void
+  toggleCamera: () => void
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -76,6 +81,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [isMuted, setIsMuted] = useState(false)
+  const [isCameraOff, setIsCameraOff] = useState(false)
+  const [iceState, setIceState] = useState<RTCIceConnectionState | null>(null)
 
   // ── Refs (RESEARCH Pattern 1 — stale closure prevention) ────────
   const pcRef = useRef<RTCPeerConnection | null>(null)
@@ -127,6 +135,37 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /**
+   * CTRL-01: Toggle microphone mute state.
+   * Uses functional updater to avoid stale closure (RESEARCH Pitfall 1).
+   * Sets track.enabled on the audio track directly via ref — no renegotiation needed.
+   */
+  const toggleMute = useCallback(() => {
+    setIsMuted((prev) => {
+      const nextMuted = !prev
+      const audioTrack = localStreamRef.current?.getAudioTracks()[0]
+      if (audioTrack) {
+        audioTrack.enabled = !nextMuted
+      }
+      return nextMuted
+    })
+  }, [])
+
+  /**
+   * CTRL-02: Toggle camera on/off state.
+   * Audio-only guard (D-12): no-op if localStream has no video tracks.
+   * Uses functional updater to avoid stale closure.
+   */
+  const toggleCamera = useCallback(() => {
+    const videoTracks = localStreamRef.current?.getVideoTracks()
+    if (!videoTracks || videoTracks.length === 0) return
+    setIsCameraOff((prev) => {
+      const nextOff = !prev
+      videoTracks[0].enabled = !nextOff
+      return nextOff
+    })
+  }, [])
+
+  /**
    * Teardown sequence (RESEARCH Pattern 4 — order matters):
    * 1. Cancel timers
    * 2. Stop media tracks (releases camera/mic indicator)
@@ -163,6 +202,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setRemoteStream(null)
     setPeerUsername(null)
     setCallStatus('idle')
+    setIsMuted(false)
+    setIsCameraOff(false)
+    setIceState(null)
   }, [])
 
   /**
@@ -189,6 +231,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // D-08/D-09 ICE state recovery
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState
+      setIceState(state as RTCIceConnectionState)
       if (state === 'disconnected') {
         // Grace window — browser may self-recover from transient glitch
         teardownTimerRef.current = setTimeout(teardown, 2000)
@@ -456,6 +499,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
         acceptCall,
         rejectCall,
         hangUp,
+        isMuted,
+        isCameraOff,
+        iceState,
+        toggleMute,
+        toggleCamera,
       }}
     >
       {children}
