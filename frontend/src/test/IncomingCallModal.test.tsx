@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { IncomingCallModal } from '@/components/IncomingCallModal'
 
 // ──────────────────────────────────────────────────────────────────
@@ -31,54 +32,91 @@ vi.mock('@/hooks/useRingtone', () => ({
 }))
 
 // ──────────────────────────────────────────────────────────────────
-// Test scaffold — Wave 0 stubs (+ 1 active test against stub)
-// Plan 03 converts it.skip → it and fills each body.
+// Reset mutable state between tests
+// ──────────────────────────────────────────────────────────────────
+afterEach(() => {
+  mockCallStatus = 'idle'
+  mockPeerUsername = null
+  mockAcceptCall.mockClear()
+  mockRejectCall.mockClear()
+})
+
+// ──────────────────────────────────────────────────────────────────
+// Tests
 // ──────────────────────────────────────────────────────────────────
 describe('IncomingCallModal', () => {
 
-  // ACTIVE: stub already returns null when not ringing — test this now
+  // CALL-02: renders nothing when not ringing
   it('CALL-02: renders nothing when callStatus !== "ringing"', () => {
     mockCallStatus = 'idle'
     mockPeerUsername = null
 
     const { container } = render(<IncomingCallModal />)
 
-    // Stub returns null → container has no children
     expect(container.firstChild).toBeNull()
   })
 
   // CALL-02: modal renders when ringing
-  it.skip('CALL-02: renders modal when callStatus === "ringing" with caller name', () => {
-    // Plan 03 implements:
-    // - set mockCallStatus = 'ringing', mockPeerUsername = 'bob'
-    // - render IncomingCallModal
-    // - expect screen.getByRole('dialog') to be in document
-    // - expect screen.getByText(/bob/i) to be in document
-    // - expect screen.getByText(/Incoming Call/i) to be in document
+  it('CALL-02: renders modal when callStatus === "ringing" with caller name', () => {
+    mockCallStatus = 'ringing'
+    mockPeerUsername = 'bob'
+
+    render(<IncomingCallModal />)
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('bob')).toBeInTheDocument()
+    expect(screen.getByText('Incoming Call')).toBeInTheDocument()
+    expect(screen.getByText('is calling you...')).toBeInTheDocument()
+  })
+
+  // CALL-02: accessibility attributes
+  it('CALL-02: modal has correct ARIA attributes', () => {
+    mockCallStatus = 'ringing'
+    mockPeerUsername = 'bob'
+
+    render(<IncomingCallModal />)
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-caller-name')
   })
 
   // CALL-03: Accept button handler
-  it.skip('CALL-03: clicking Accept button calls acceptCall()', () => {
-    // Plan 03 implements:
-    // - set mockCallStatus = 'ringing'
-    // - render, click Accept button
-    // - expect mockAcceptCall called once
+  it('CALL-03: clicking Accept button calls acceptCall()', async () => {
+    mockCallStatus = 'ringing'
+    mockPeerUsername = 'bob'
+
+    render(<IncomingCallModal />)
+
+    const acceptBtn = screen.getByRole('button', { name: 'Accept call from bob' })
+    await userEvent.click(acceptBtn)
+
+    expect(mockAcceptCall).toHaveBeenCalledOnce()
   })
 
   // CALL-03: Reject button handler
-  it.skip('CALL-03: clicking Reject button calls rejectCall()', () => {
-    // Plan 03 implements:
-    // - set mockCallStatus = 'ringing'
-    // - render, click Reject button
-    // - expect mockRejectCall called once
+  it('CALL-03: clicking Reject button calls rejectCall()', async () => {
+    mockCallStatus = 'ringing'
+    mockPeerUsername = 'bob'
+
+    render(<IncomingCallModal />)
+
+    const rejectBtn = screen.getByRole('button', { name: 'Reject call from bob' })
+    await userEvent.click(rejectBtn)
+
+    expect(mockRejectCall).toHaveBeenCalledOnce()
   })
 
   // CALL-02: Escape key accessibility (UI-SPEC §9)
-  it.skip('CALL-02: Escape key on backdrop calls rejectCall()', () => {
-    // Plan 03 implements:
-    // - set mockCallStatus = 'ringing'
-    // - render, press Escape key
-    // - expect mockRejectCall called once
+  it('CALL-02: Escape key on backdrop calls rejectCall()', async () => {
+    mockCallStatus = 'ringing'
+    mockPeerUsername = 'bob'
+
+    render(<IncomingCallModal />)
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(mockRejectCall).toHaveBeenCalledOnce()
   })
 
 })
