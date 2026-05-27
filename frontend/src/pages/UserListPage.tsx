@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWebSocket } from '@/contexts/WebSocketContext'
+import { useCall } from '@/contexts/CallContext'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Video, Phone, LogOut, Users } from 'lucide-react'
+import { Video, Phone, LogOut, Users, Loader2 } from 'lucide-react'
 import api from '@/lib/api'
 
 // ──────────────────────────────────────────────────────────────────
@@ -16,6 +17,8 @@ const COPY = {
   countBadge: (n: number) => `${n} online`,
   onlineBadge: '● Online',
   callButton: 'Call',
+  callingButton: 'Calling...',
+  callingAriaLabel: (u: string) => `Calling ${u}...`,
   logoutButton: 'Logout',
   emptyHeading: 'No one else is online',
   emptyBody: 'Share the app link with a friend to start a call.',
@@ -25,10 +28,22 @@ const COPY = {
 // ──────────────────────────────────────────────────────────────────
 // UserRow — extracted for readability (keeps page file under ~180 lines)
 // ──────────────────────────────────────────────────────────────────
-function UserRow({ user }: { user: string }) {
+function UserRow({
+  user,
+  callStatus,
+  peerUsername,
+  onCall,
+}: {
+  user: string
+  callStatus: string
+  peerUsername: string | null
+  onCall: (username: string) => void
+}) {
+  const isCallActive = callStatus !== 'idle'
+  const isCallingThisUser = callStatus === 'calling' && peerUsername === user
+
   return (
     <li
-      key={user}
       className="flex items-center gap-4 px-6 py-3 hover:bg-slate-800/50 transition-colors duration-150 animate-in fade-in slide-in-from-top-1 duration-300"
     >
       <Avatar className="h-10 w-10">
@@ -39,15 +54,28 @@ function UserRow({ user }: { user: string }) {
       <span className="text-sm font-normal text-slate-50 truncate max-w-[160px]">{user}</span>
       <span className="flex-1" />
       <span className="text-xs font-normal text-emerald-400">{COPY.onlineBadge}</span>
-      <Button
-        size="sm"
-        className="bg-emerald-500 hover:bg-emerald-600 text-white"
-        aria-label={`Call ${user}`}
-        onClick={() => { /* TODO Phase 4 — call initiation */ }}
-      >
-        <Phone className="size-4 mr-2" />
-        {COPY.callButton}
-      </Button>
+      {isCallingThisUser ? (
+        <Button
+          size="sm"
+          disabled
+          className="bg-slate-700 text-emerald-400 cursor-not-allowed h-8"
+          aria-label={COPY.callingAriaLabel(user)}
+        >
+          <Loader2 className="animate-spin size-4 mr-2" />
+          {COPY.callingButton}
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          className="bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 disabled:pointer-events-none"
+          aria-label={`Call ${user}`}
+          disabled={isCallActive}
+          onClick={() => onCall(user)}
+        >
+          <Phone className="size-4 mr-2" />
+          {COPY.callButton}
+        </Button>
+      )}
     </li>
   )
 }
@@ -58,6 +86,7 @@ function UserRow({ user }: { user: string }) {
 export default function UserListPage() {
   const { username, dispatch } = useAuth()
   const { onlineUsers, isLoading, disconnect } = useWebSocket()
+  const { callStatus, peerUsername, startCall } = useCall()
   const navigate = useNavigate()
 
   // Self-filter — RESEARCH Pitfall 4 / UI-SPEC §6
@@ -139,7 +168,13 @@ export default function UserListPage() {
           {!isLoading && otherUsers.length > 0 && (
             <ul className="divide-y divide-slate-700/50">
               {otherUsers.map(user => (
-                <UserRow key={user} user={user} />
+                <UserRow
+                  key={user}
+                  user={user}
+                  callStatus={callStatus}
+                  peerUsername={peerUsername}
+                  onCall={startCall}
+                />
               ))}
             </ul>
           )}
