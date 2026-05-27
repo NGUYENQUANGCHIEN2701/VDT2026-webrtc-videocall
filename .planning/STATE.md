@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planned
-last_updated: "2026-05-27T11:00:00.000Z"
-last_activity: 2026-05-27 -- Phase 05 planned (2 plans, 2 waves)
+status: executing
+last_updated: "2026-05-27T15:04:32.543Z"
+last_activity: 2026-05-27
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 50
 ---
 
@@ -20,15 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-24)
 
 **Core value:** Two users on the same LAN can make a stable WebRTC video/audio call — from login to connected in seconds.
-**Current focus:** Phase 05 — call-ux-polish (next)
+**Current focus:** Phase 05 — call-controls
 
 ## Current Position
 
-Phase: 04 (1-1-call-core) — COMPLETE
-Status: Phase 04 done — all 5 plans executed, UAT approved, 6 ROADMAP criteria verified
-Last activity: 2026-05-27 -- Phase 04 UAT approved
+Phase: 05 (call-controls) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-05-27
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -48,6 +49,7 @@ Progress: [█████████░] 89%
 
 *Updated after each plan completion*
 | Phase 03-react-auth-user-list P02 | 35 minutes | 2 tasks | 5 files |
+| Phase 05-call-controls P01 | 130 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -61,6 +63,7 @@ Recent decisions affecting current work:
 - Group call topology: Mesh P2P (no SFU); practical for 3-5 peers on LAN
 - ICE: Google public STUN only; no TURN needed for LAN demo
 - Recording: Browser MediaRecorder + local download; no server storage
+- [Phase ?]: iceState exposed from CallContext (centralized) per D-10; toggleMute/toggleCamera use functional updater pattern
 
 ### Pending Todos
 
@@ -79,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-27T10:27:52.456Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-call-controls/05-CONTEXT.md
+Last session: 2026-05-27T15:04:32.534Z
+Stopped at: Completed 05-01-PLAN.md — CallContext toggle state + iceState extension
+Resume file: None

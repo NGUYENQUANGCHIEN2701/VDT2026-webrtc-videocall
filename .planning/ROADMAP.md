@@ -142,11 +142,11 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   5. Connection status (Connecting / Connected / Reconnecting / Failed) is displayed as a visual indicator throughout the call lifecycle
   6. The user's own video appears as a small mirrored overlay; the remote user's video fills the dominant view with the remote user's name overlaid
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Extend CallContext: isMuted/isCameraOff/iceState state + toggleMute/toggleCamera functions + teardown resets + unit tests
+- [x] 05-01-PLAN.md — Extend CallContext: isMuted/isCameraOff/iceState state + toggleMute/toggleCamera functions + teardown resets + unit tests
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -213,7 +213,7 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 | 2. WebSocket Infrastructure | 3/3 | Complete    | 2026-05-25 |
 | 3. React Auth + User List | 3/3 | Done | 2026-05-26 |
 | 4. 1-1 Call Core | 0/? | Not started | - |
-| 5. Call Controls | 0/? | Not started | - |
+| 5. Call Controls | 1/2 | In Progress|  |
 | 6. Screen Sharing | 0/? | Not started | - |
 | 7. Group Call (Mesh) | 0/? | Not started | - |
 | 8. Recording + Deliverables | 0/? | Not started | - |
