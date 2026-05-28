@@ -71,7 +71,7 @@ const CallContext = createContext<CallContextValue | null>(null)
 // outermost per D-04.
 // ──────────────────────────────────────────────────────────────────
 export function CallProvider({ children }: { children: ReactNode }) {
-  const { client, subscribe, publish } = useWebSocket()
+  const { isConnected, subscribe, publish } = useWebSocket()
   const { username } = useAuth()
   const navigate = useNavigate()
 
@@ -357,21 +357,30 @@ export function CallProvider({ children }: { children: ReactNode }) {
     [publishSignal, navigate, teardown, addToast, drainIceCandidateBuffer],
   )
 
-  // ── STOMP subscription (RESEARCH Pattern 3) ─────────────────────
+  // ── Stable ref for handleSignal — prevents subscription teardown on re-render ──
+  const handleSignalRef = useRef(handleSignal)
   useEffect(() => {
-    if (!client?.connected) return
+    handleSignalRef.current = handleSignal
+  }, [handleSignal])
+
+  // ── STOMP subscription (RESEARCH Pattern 3) ─────────────────────
+  // Depends on isConnected so the effect re-runs when STOMP connects.
+  // client?.connected would be false at the time setClient() triggers
+  // the effect — the connection completes later, flipping isConnected.
+  // handleSignal is read via ref so the subscription never resets when
+  // the handler reference changes (e.g. on presence list update).
+  useEffect(() => {
+    if (!isConnected) return
 
     const sub = subscribe('/user/queue/signal', (frame: IMessage) => {
       const msg = JSON.parse(frame.body) as SignalMessage
-      // handleSignal is async but STOMP callback must be sync —
-      // fire-and-forget; errors caught inside handleSignal
-      void handleSignal(msg)
+      void handleSignalRef.current(msg)
     })
 
     return () => {
       sub?.unsubscribe()
     }
-  }, [client, subscribe, handleSignal])
+  }, [isConnected, subscribe])
 
   // ── Helpers ─────────────────────────────────────────────────────
 
@@ -399,6 +408,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
    * CALL-01: Initiate an outgoing call.
    * Pitfall 6: do NOT createOffer here — offer is created in call-accept handler.
    * T-4-03: Guard against self-call.
+   *
+   * Media and PC are acquired BEFORE sending call-request to prevent a race
+   * condition where the callee accepts instantly and call-accept arrives while
+   * pcRef.current is still null, causing a null-deref → teardown crash.
    */
   const startCall = async (targetUsername: string): Promise<void> => {
     // Self-call guard (T-4-03)
@@ -408,8 +421,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
     peerUsernameRef.current = targetUsername
     setCallStatus('calling')
 
-    // Signal call-request first so callee sees the modal immediately,
-    // before we block on getUserMedia (which can take a few seconds to prompt)
+    // Acquire local media (with audio-only fallback if no camera)
+    const stream = await getLocalStream()
+    if (!stream) {
+      teardown()
+      return
+    }
+    localStreamRef.current = stream
+    setLocalStream(stream)
+
+    // Create peer connection and add tracks — must be done before call-request
+    // so pcRef.current is ready when call-accept arrives
+    const pc = createPeerConnection()
+    stream.getTracks().forEach((t) => pc.addTrack(t, stream))
+    pcRef.current = pc
+
+    // PC ready — now safe to notify callee
     publishSignal({ type: 'call-request', to: targetUsername, payload: '' })
 
     // 30-second no-answer timeout (CALL-07)
@@ -418,22 +445,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
       addToast('No answer', 'bg-slate-800 border border-amber-600/40 text-amber-400')
       teardown()
     }, 30_000)
-
-    // Acquire local media (with audio-only fallback if no camera)
-    const stream = await getLocalStream()
-    if (!stream) {
-      // Cancel the outgoing call — callee modal will dismiss on receiving call-end
-      publishSignal({ type: 'call-end', to: targetUsername, payload: '' })
-      teardown()
-      return
-    }
-    localStreamRef.current = stream
-    setLocalStream(stream)
-
-    // Create peer connection and add tracks
-    const pc = createPeerConnection()
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream))
-    pcRef.current = pc
   }
 
   /**
@@ -461,11 +472,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // Signal call-accept to caller (caller will now create offer)
     publishSignal({ type: 'call-accept', to: target, payload: '' })
 
+    // Transition to 'calling' so IncomingCallModal is hidden and CallPage stays.
+    // 'connected' is set by oniceconnectionstatechange on both sides symmetrically.
+    setCallStatus('calling')
+
     // Navigate to call page (D-07)
     navigate('/call')
-
-    // Optimistic connected state — ICE will confirm via oniceconnectionstatechange
-    setCallStatus('connected')
   }
 
   /**
@@ -480,10 +492,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   /**
    * CALL-08: Hang up the current call.
-   * Sends call-end signal then runs teardown.
+   * Guards against null peer so it is safe to call after teardown already ran
+   * (e.g. from the CallPage unmount cleanup or StrictMode simulated cleanup).
    */
   const hangUp = (): void => {
-    publishSignal({ type: 'call-end', to: peerUsernameRef.current!, payload: '' })
+    if (peerUsernameRef.current) {
+      publishSignal({ type: 'call-end', to: peerUsernameRef.current, payload: '' })
+    }
     teardown()
   }
 

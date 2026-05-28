@@ -80,10 +80,12 @@ export default function CallPage() {
     }
   }, [callStatus, navigate])
 
-  // Pitfall 5: stop media tracks if user navigates away via browser back button
+  // Pitfall 5: stop media tracks if user navigates away via browser back button.
+  // hangUp() guards against null peer internally, so it is safe to call unconditionally —
+  // no signal is sent when teardown already ran (peerUsernameRef is null).
   useEffect(() => {
     return () => {
-      if (callStatus !== 'idle') hangUp()
+      hangUp()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs'
 
 interface WebSocketContextValue {
@@ -69,13 +69,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const subscribe = (destination: string, callback: (msg: IMessage) => void) => {
+  const subscribe = useCallback((destination: string, callback: (msg: IMessage) => void) => {
     return client?.subscribe(destination, callback)
-  }
+  }, [client])
 
-  const publish = (destination: string, body: string) => {
+  const publish = useCallback((destination: string, body: string) => {
     client?.publish({ destination, body })
-  }
+  }, [client])
 
   return (
     <WebSocketContext.Provider value={{ client, onlineUsers, isLoading, isConnected, connect, disconnect, subscribe, publish }}>
