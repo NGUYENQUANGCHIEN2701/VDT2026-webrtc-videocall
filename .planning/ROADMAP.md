@@ -167,11 +167,11 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
   3. Clicking "Stop Sharing" (or using the browser native stop button) restores the camera view on both sides
   4. The remote peer sees the screen share stream automatically with no additional action required on their end
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 **Wave 0**
 
-- [ ] 06-01-PLAN.md — Test infrastructure: getDisplayMedia/getSenders/replaceTrack mocks + mockScreenTrack in setup.ts; failing CallContext (11) + CallPage screen-share test scaffolds
+- [x] 06-01-PLAN.md — Test infrastructure: getDisplayMedia/getSenders/replaceTrack mocks + mockScreenTrack in setup.ts; failing CallContext (11) + CallPage screen-share test scaffolds
 
 **Wave 1** *(blocked on Wave 0)*
 
@@ -227,6 +227,6 @@ Eight phases deliver a WebRTC video call application from backend foundation to 
 | 3. React Auth + User List | 3/3 | Done | 2026-05-26 |
 | 4. 1-1 Call Core | 0/? | Not started | - |
 | 5. Call Controls | 2/2 | Complete   | 2026-05-27 |
-| 6. Screen Sharing | 0/3 | Planned | - |
+| 6. Screen Sharing | 1/3 | In Progress|  |
 | 7. Group Call (Mesh) | 0/? | Not started | - |
 | 8. Recording + Deliverables | 0/? | Not started | - |
