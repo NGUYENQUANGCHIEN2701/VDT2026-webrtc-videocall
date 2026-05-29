@@ -35,7 +35,7 @@ Hai người dùng trên cùng mạng LAN có thể thực hiện cuộc gọi v
 - [ ] Giao diện video call screen hoạt động ổn định
 
 **Advanced Features (for high score)**
-- [ ] Screen sharing: chia sẻ màn hình trong cuộc gọi (thay thế hoặc kèm webcam)
+- [x] Screen sharing: chia sẻ màn hình trong cuộc gọi (thay thế hoặc kèm webcam) — Validated in Phase 06
 - [ ] Group call: gọi nhóm 3+ người theo mô hình mesh (peer-to-peer giữa các cặp)
 - [ ] Recording: ghi lại cuộc gọi bằng MediaRecorder API, lưu file xuống máy
 
@@ -82,6 +82,10 @@ Hai người dùng trên cùng mạng LAN có thể thực hiện cuộc gọi v
 | Mesh topology cho group call | Tránh cần SFU server, phù hợp nhóm nhỏ | — Pending |
 | Google STUN (stun.l.google.com) | Public, miễn phí, đủ cho LAN demo | — Pending |
 | MediaRecorder API cho recording | Browser native, không cần server-side processing | — Pending |
+
+## Current State
+
+Phase 06 (screen-sharing) complete — `startScreenShare`/`stopScreenShare` via `replaceTrack`, Share button in CallPage control bar, Camera disabled-while-sharing.
 
 ---
 
