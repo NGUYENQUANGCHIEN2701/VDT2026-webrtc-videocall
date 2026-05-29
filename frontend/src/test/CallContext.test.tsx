@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { CallProvider, useCall } from '@/contexts/CallContext'
-import { mockAudioTrack, mockVideoTrack } from './setup'
+import { mockAudioTrack, mockVideoTrack, mockScreenTrack } from './setup'
 
 // ──────────────────────────────────────────────────────────────────
 // Mutable mock values — mutated per test case
@@ -764,6 +764,259 @@ describe('CallContext', () => {
     await waitFor(() => {
       expect(result.current.iceState).toBe('checking')
     })
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // Phase 6 — Screen sharing RED tests (SCRN-01 through D-08)
+  // These tests FAIL until Plan 02 implements the API.
+  // ──────────────────────────────────────────────────────────────────
+
+  // Helper type for the extended context value (Phase 6 additions not yet in interface)
+  type CallContextWithScreenShare = ReturnType<typeof useCall> & {
+    isScreenSharing: boolean
+    startScreenShare: () => Promise<void>
+    stopScreenShare: () => void
+  }
+
+  describe('CallContext — screen sharing', () => {
+
+    beforeEach(() => {
+      // Reset screen track state to avoid cross-test leakage
+      mockScreenTrack.stop.mockClear()
+      mockScreenTrack.onended = null
+      // Reset mock per-test
+      mockPublish = vi.fn()
+      mockSubscribe = vi.fn().mockImplementation((_dest: string, cb: (frame: { body: string }) => void) => {
+        subscribeCallbackRef = cb
+        return { unsubscribe: vi.fn() }
+      })
+      mockClient = { connected: true }
+      mockNavigate.mockReset()
+      subscribeCallbackRef = null
+    })
+
+    it('SCRN-01/02: startScreenShare calls getDisplayMedia and sets isScreenSharing to true', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith({ video: true })
+      expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(true)
+    })
+
+    it('SCRN-02: startScreenShare calls replaceTrack on the video sender with the screen track', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      const MockPC = globalThis.RTCPeerConnection as unknown as {
+        lastInstance?: {
+          getSenders: ReturnType<typeof vi.fn>
+        }
+      }
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      const sender = MockPC.lastInstance?.getSenders()[0] as { replaceTrack: ReturnType<typeof vi.fn> }
+      expect(sender?.replaceTrack).toHaveBeenCalledWith(mockScreenTrack)
+    })
+
+    it('SCRN-03: stopScreenShare calls replaceTrack with the camera track and sets isScreenSharing to false', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      act(() => {
+        (result.current as unknown as CallContextWithScreenShare).stopScreenShare()
+      })
+
+      await waitFor(() => {
+        expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+      })
+
+      const MockPC = globalThis.RTCPeerConnection as unknown as {
+        lastInstance?: {
+          getSenders: ReturnType<typeof vi.fn>
+        }
+      }
+      const sender = MockPC.lastInstance?.getSenders()[0] as { replaceTrack: ReturnType<typeof vi.fn> }
+      expect(sender?.replaceTrack).toHaveBeenCalledWith(mockVideoTrack)
+    })
+
+    it('SCRN-03: stopScreenShare stops the screen track', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      act(() => {
+        (result.current as unknown as CallContextWithScreenShare).stopScreenShare()
+      })
+
+      await waitFor(() => {
+        expect(mockScreenTrack.stop).toHaveBeenCalled()
+      })
+    })
+
+    it('D-06: screenTrack.onended triggers stopScreenShare', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      await act(async () => {
+        mockScreenTrack.onended?.()
+      })
+
+      await waitFor(() => {
+        expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+      })
+    })
+
+    it('D-08: teardown resets isScreenSharing to false', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      act(() => {
+        result.current.hangUp()
+      })
+
+      await waitFor(() => {
+        expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+      })
+    })
+
+    it('D-08: teardown stops the active screen track', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      act(() => {
+        result.current.hangUp()
+      })
+
+      await waitFor(() => {
+        expect(result.current.callStatus).toBe('idle')
+      })
+
+      expect(mockScreenTrack.stop).toHaveBeenCalled()
+    })
+
+    it('SCRN-01: startScreenShare shows "Screen sharing cancelled" toast on NotAllowedError', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      vi.mocked(navigator.mediaDevices.getDisplayMedia).mockRejectedValueOnce(
+        new DOMException('Permission denied', 'NotAllowedError'),
+      )
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      expect(result.current.toasts.some((t) => t.message === 'Screen sharing cancelled')).toBe(true)
+      expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+    })
+
+    it('SCRN-01: startScreenShare shows "Screen sharing unavailable" toast on non-NotAllowedError', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      vi.mocked(navigator.mediaDevices.getDisplayMedia).mockRejectedValueOnce(
+        new Error('boom'),
+      )
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      expect(result.current.toasts.some((t) => t.message === 'Screen sharing unavailable')).toBe(true)
+      expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+    })
+
+    it('startScreenShare is a no-op when there is no active peer connection', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      // Do NOT start a call — pcRef.current is null
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      expect(navigator.mediaDevices.getDisplayMedia).not.toHaveBeenCalled()
+      expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+    })
+
+    it('startScreenShare shows an error and does not set isScreenSharing when no video sender exists', async () => {
+      const { result } = renderHook(() => useCall(), { wrapper })
+
+      await act(async () => {
+        await result.current.startCall('bob')
+      })
+
+      // Override getSenders to return only an audio sender
+      const MockPC = globalThis.RTCPeerConnection as unknown as {
+        lastInstance?: {
+          getSenders: ReturnType<typeof vi.fn>
+        }
+      }
+      if (MockPC.lastInstance) {
+        MockPC.lastInstance.getSenders.mockReturnValueOnce([
+          { track: { kind: 'audio' }, replaceTrack: vi.fn() },
+        ])
+      }
+
+      await act(async () => {
+        await (result.current as unknown as CallContextWithScreenShare).startScreenShare()
+      })
+
+      expect((result.current as unknown as CallContextWithScreenShare).isScreenSharing).toBe(false)
+    })
+
   })
 
 })
