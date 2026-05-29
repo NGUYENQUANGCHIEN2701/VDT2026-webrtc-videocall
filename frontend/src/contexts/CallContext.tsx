@@ -38,6 +38,9 @@ export interface CallContextValue {
   iceState: RTCIceConnectionState | null
   toggleMute: () => void
   toggleCamera: () => void
+  isScreenSharing: boolean
+  startScreenShare: () => Promise<void>
+  stopScreenShare: () => void
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -84,10 +87,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [isMuted, setIsMuted] = useState(false)
   const [isCameraOff, setIsCameraOff] = useState(false)
   const [iceState, setIceState] = useState<RTCIceConnectionState | null>(null)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
 
   // ── Refs (RESEARCH Pattern 1 — stale closure prevention) ────────
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null)
+  // Mirror stopScreenShare into a ref to prevent stale closure in screenTrack.onended
+  // (follows the established handleSignalRef pattern at lines 361-364)
+  const stopScreenShareRef = useRef<() => void>(() => {})
   const peerUsernameRef = useRef<string | null>(null)        // Pitfall 2 fix
   const iceCandidateBufferRef = useRef<RTCIceCandidate[]>([])
   const remoteDescSetRef = useRef(false)
@@ -166,9 +174,82 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /**
+   * SCRN-03 / D-06: Stop screen sharing and restore camera track.
+   * Defined BEFORE startScreenShare so onended wiring is clear.
+   * Uses Option A (re-query sender) per RESEARCH Pattern 5.
+   */
+  const stopScreenShare = useCallback((): void => {
+    const cameraTrack = localStreamRef.current?.getVideoTracks()[0]
+    const videoSender = pcRef.current?.getSenders().find((s) => s.track?.kind === 'video')
+
+    if (videoSender && cameraTrack) {
+      void videoSender.replaceTrack(cameraTrack)
+    }
+
+    screenTrackRef.current?.stop()
+    screenTrackRef.current = null
+    setIsScreenSharing(false)
+  }, [])
+
+  // Mirror stopScreenShare into ref — same pattern as handleSignalRef (lines 361-364)
+  // Prevents stale closure in screenTrack.onended (RESEARCH Pitfall 1)
+  useEffect(() => {
+    stopScreenShareRef.current = stopScreenShare
+  }, [stopScreenShare])
+
+  /**
+   * SCRN-01/02/04, D-06: Start screen sharing.
+   * Calls getDisplayMedia, finds the video sender, replaces track via replaceTrack
+   * (no SDP renegotiation — SCRN-02), attaches onended handler (D-06).
+   */
+  const startScreenShare = useCallback(async (): Promise<void> => {
+    // Guard: no active peer connection
+    if (!pcRef.current) return
+
+    let screenTrack: MediaStreamTrack | null = null
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      screenTrack = screenStream.getVideoTracks()[0]
+    } catch (err) {
+      // jsdom's DOMException does not pass `instanceof Error` or `instanceof Object`,
+      // so read .name directly via property access (works for DOMException, Error, and
+      // any other thrown value that has a .name property).
+      const errName = err != null ? (err as { name?: string }).name : undefined
+      if (errName === 'NotAllowedError') {
+        addToast('Screen sharing cancelled', 'bg-slate-800 border border-slate-700 text-slate-400')
+      } else {
+        addToast('Screen sharing unavailable', 'bg-slate-800 border border-amber-600/40 text-amber-400')
+      }
+      return
+    }
+
+    // Guard: call may have ended while user was in the picker (RESEARCH Pitfall 2)
+    if (!pcRef.current) {
+      screenTrack.stop()
+      return
+    }
+
+    const videoSender = pcRef.current.getSenders().find((s) => s.track?.kind === 'video')
+    if (!videoSender) {
+      // Audio-only call — no video sender to replace (RESEARCH Pitfall 5)
+      screenTrack.stop()
+      return
+    }
+
+    await videoSender.replaceTrack(screenTrack)
+    screenTrackRef.current = screenTrack
+    setIsScreenSharing(true)
+
+    // D-06: fires when user clicks browser native "Stop sharing" bar
+    // Use ref to avoid stale closure (RESEARCH Pitfall 1)
+    screenTrack.onended = () => stopScreenShareRef.current()
+  }, [addToast])
+
+  /**
    * Teardown sequence (RESEARCH Pattern 4 — order matters):
    * 1. Cancel timers
    * 2. Stop media tracks (releases camera/mic indicator)
+   * 2.5. Phase 6: stop screen track if active (D-08)
    * 3. Close peer connection
    * 4. Reset refs
    * 5. Update React state last
@@ -188,6 +269,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     localStreamRef.current?.getTracks().forEach((t) => t.stop())
     localStreamRef.current = null
 
+    // 2.5 — Phase 6: stop screen track if active (D-08, T-06-04)
+    screenTrackRef.current?.stop()
+    screenTrackRef.current = null
+
     // 3. Close peer connection
     pcRef.current?.close()
     pcRef.current = null
@@ -205,6 +290,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIsMuted(false)
     setIsCameraOff(false)
     setIceState(null)
+    setIsScreenSharing(false)
   }, [])
 
   /**
@@ -519,6 +605,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
         iceState,
         toggleMute,
         toggleCamera,
+        isScreenSharing,
+        startScreenShare,
+        stopScreenShare,
       }}
     >
       {children}

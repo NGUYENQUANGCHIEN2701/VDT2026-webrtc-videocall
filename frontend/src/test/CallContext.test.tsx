@@ -784,6 +784,11 @@ describe('CallContext', () => {
       // Reset screen track state to avoid cross-test leakage
       mockScreenTrack.stop.mockClear()
       mockScreenTrack.onended = null
+      // Reset getDisplayMedia call count to avoid accumulation across tests
+      vi.mocked(navigator.mediaDevices.getDisplayMedia).mockClear()
+      vi.mocked(navigator.mediaDevices.getDisplayMedia).mockResolvedValue(
+        { getTracks: vi.fn().mockReturnValue([mockScreenTrack]), getVideoTracks: vi.fn().mockReturnValue([mockScreenTrack]) } as unknown as MediaStream
+      )
       // Reset mock per-test
       mockPublish = vi.fn()
       mockSubscribe = vi.fn().mockImplementation((_dest: string, cb: (frame: { body: string }) => void) => {
