@@ -16,9 +16,9 @@
 - **Giao diện danh sách người dùng** — Live presence rows, self-filter, empty state, logout
 - **1-1 Video Call** — WebRTC P2P, incoming call modal, accept/reject, ringtone (Web Audio API), 30s timeout, ICE recovery
 - **Call Controls** — Mute mic, toggle camera, duration timer (MM:SS), ICE connection status pill, Cancel call button
+- **Screen Sharing** — Chia sẻ màn hình trong cuộc gọi bằng `getDisplayMedia()` + `replaceTrack()`, không cần renegotiation; nút Stop bằng cả UI lẫn thanh native của trình duyệt
 
 ### Kế hoạch tiếp theo
-- **Screen Sharing** — Chia sẻ màn hình bằng `getDisplayMedia()` *(Phase 6)*
 - **Group Call (Mesh)** — Gọi nhóm 3–5 người, kiến trúc mesh P2P *(Phase 7)*
 - **Recording** — Ghi lại cuộc gọi bằng `MediaRecorder API`, download `.webm` *(Phase 8)*
 - **Docker Compose** — Chạy toàn bộ stack bằng một lệnh *(Phase 8)*
@@ -302,6 +302,28 @@ Thêm đầy đủ call controls vào UI: toggle mic/camera, timer đếm thời
 
 ---
 
+### Phase 6 — Screen Sharing
+
+Thêm tính năng chia sẻ màn hình vào cuộc gọi 1-1 đang diễn ra, không cần renegotiation.
+
+**`CallContext` mở rộng:**
+- 3 fields mới: `isScreenSharing`, `startScreenShare()`, `stopScreenShare()`
+- `startScreenShare()`: gọi `navigator.mediaDevices.getDisplayMedia({ video: true })`, tìm video sender qua `getSenders().find(s => s.track?.kind === 'video')`, dùng `sender.replaceTrack(screenTrack)` để thay track — không renegotiate, remote peer nhận screen tức thì (SCRN-02, SCRN-04)
+- `stopScreenShare()`: `replaceTrack` ngược lại với camera track, stop screen track, reset state
+- Stale-closure guard: `stopScreenShareRef` mirror pattern (giống `handleSignalRef`) — đảm bảo `screenTrack.onended` gọi đúng `stopScreenShare` hiện tại (D-06)
+- `teardown()` mở rộng: stop screen track và reset `isScreenSharing` khi kết thúc cuộc gọi (D-08)
+- Error handling: `NotAllowedError` → toast "Screen sharing cancelled"; lỗi khác → "Screen sharing unavailable"
+
+**`CallPage` mở rộng — 4-button control bar:**
+- Control bar từ 3 lên 4 nút: **Mic · Share · End Call · Camera** (End Call là anchor giữa, D-01)
+- Share button: idle → `bg-slate-700` + icon `Monitor`; active → `bg-emerald-600` + icon `MonitorOff`; `aria-pressed`, `aria-label` động, không bao giờ bị disabled
+- Camera button: thêm `disabled={!hasVideoTracks || isScreenSharing}` — tự động disable khi đang share (D-05)
+- Local PiP video tiếp tục bind `localStream` (camera) trong khi share — không bị thay bởi screen stream (D-04)
+
+**Test coverage:** 74/74 tests GREEN (18 tests mới: 11 CallContext + 7 CallPage; 9 pre-existing failures không liên quan đến Phase 6).
+
+---
+
 ## Cấu trúc thư mục
 
 ```
@@ -491,7 +513,7 @@ npm test
 | 3 | React Auth + User List UI | Hoàn thành |
 | 4 | 1-1 Video Call Core (WebRTC P2P) | Hoàn thành |
 | 5 | Call Controls (mute, camera, timer, ICE status) | Hoàn thành |
-| 6 | Screen Sharing | Chưa bắt đầu |
+| 6 | Screen Sharing (getDisplayMedia + replaceTrack) | Hoàn thành |
 | 7 | Group Call Mesh (3–5 người) | Chưa bắt đầu |
 | 8 | Recording + Docker Compose + Docs | Chưa bắt đầu |
 
