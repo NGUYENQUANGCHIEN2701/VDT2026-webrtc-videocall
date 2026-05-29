@@ -18,6 +18,9 @@ class MockRTCPeerConnection {
   iceConnectionState = 'new'
 
   addTrack = vi.fn()
+  getSenders = vi.fn().mockReturnValue([
+    { track: mockVideoTrack, replaceTrack: vi.fn().mockResolvedValue(undefined) },
+  ])
   createOffer = vi.fn().mockResolvedValue({ type: 'offer', sdp: 'mock-sdp' })
   createAnswer = vi.fn().mockResolvedValue({ type: 'answer', sdp: 'mock-sdp' })
   setLocalDescription = vi.fn().mockResolvedValue(undefined)
@@ -71,17 +74,25 @@ vi.stubGlobal('RTCIceCandidate', MockRTCIceCandidate)
 // enabled properties for Phase 5 toggle tests.
 // ──────────────────────────────────────────────────────────────────
 export const mockAudioTrack = { stop: vi.fn(), enabled: true }
-export const mockVideoTrack = { stop: vi.fn(), enabled: true }
+export const mockVideoTrack = { stop: vi.fn(), enabled: true, kind: 'video' }
+export const mockScreenTrack = { stop: vi.fn(), onended: null as (() => void) | null, kind: 'video' }
+
 const mockMediaStream = {
   getTracks: vi.fn().mockReturnValue([mockAudioTrack]),
   getAudioTracks: vi.fn().mockReturnValue([mockAudioTrack]),
   getVideoTracks: vi.fn().mockReturnValue([mockVideoTrack]),
 }
 
+const mockScreenStream = {
+  getTracks: vi.fn().mockReturnValue([mockScreenTrack]),
+  getVideoTracks: vi.fn().mockReturnValue([mockScreenTrack]),
+}
+
 vi.stubGlobal('navigator', {
   ...globalThis.navigator,
   mediaDevices: {
     getUserMedia: vi.fn().mockResolvedValue(mockMediaStream),
+    getDisplayMedia: vi.fn().mockResolvedValue(mockScreenStream),
   },
 })
 
