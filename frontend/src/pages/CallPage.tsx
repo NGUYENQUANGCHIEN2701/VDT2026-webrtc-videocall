@@ -1,13 +1,14 @@
 // ──────────────────────────────────────────────────────────────────
 // CallPage — full UI per UI-SPEC §5.3 (Phase 4) + §5 extensions (Phase 5)
 // Remote video full-screen, local PiP overlay, peer name overlay,
-// timer overlay, connection status overlay, and 3-button control bar.
+// timer overlay, connection status overlay, and 4-button control bar.
 // Phase 5 adds: Mic toggle, Camera toggle, useCallTimer, ICE status.
+// Phase 6 adds: Share Screen button, Camera disabled-while-sharing (D-05).
 // ──────────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Users, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react'
+import { Users, PhoneOff, Mic, MicOff, Video, VideoOff, Monitor, MonitorOff } from 'lucide-react'
 import { useCall } from '@/contexts/CallContext'
 import { useCallTimer } from '@/hooks/useCallTimer'
 
@@ -22,6 +23,9 @@ const COPY = {
   cameraOffLabel: 'Turn off camera',
   cameraOnLabel: 'Turn on camera',
   cameraUnavailableLabel: 'Camera unavailable',
+  shareScreenLabel: 'Share screen',
+  stopSharingLabel: 'Stop sharing',
+  cameraDisabledSharingLabel: 'Camera disabled while sharing',
 } as const
 
 // ──────────────────────────────────────────────────────────────────
@@ -53,6 +57,9 @@ export default function CallPage() {
     iceState,
     toggleMute,
     toggleCamera,
+    isScreenSharing,
+    startScreenShare,
+    stopScreenShare,
   } = useCall()
   const navigate = useNavigate()
 
@@ -145,7 +152,7 @@ export default function CallPage() {
         />
       </div>
 
-      {/* Control bar — 3-button row: Mic (left) | End Call (center) | Camera (right) */}
+      {/* Control bar — 4-button row: Mic (left) | Share | End Call (center) | Camera (right) */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-slate-900/90 backdrop-blur-sm border-t border-slate-700 flex items-center justify-center gap-4">
         {/* Mic toggle button — D-03 */}
         <Button
@@ -157,6 +164,17 @@ export default function CallPage() {
           {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
         </Button>
 
+        {/* Share Screen button — Phase 6 D-01, D-03; never disabled (UI-SPEC §5.2) */}
+        <Button
+          className={`h-10 w-10 rounded-full text-white transition-colors duration-150 ${isScreenSharing ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+          aria-label={isScreenSharing ? COPY.stopSharingLabel : COPY.shareScreenLabel}
+          title={isScreenSharing ? COPY.stopSharingLabel : COPY.shareScreenLabel}
+          aria-pressed={isScreenSharing}
+          onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+        >
+          {isScreenSharing ? <MonitorOff className="size-4" /> : <Monitor className="size-4" />}
+        </Button>
+
         {/* End Call button — inherited from Phase 4, center anchor */}
         <Button
           className="h-12 w-12 rounded-full bg-red-600 hover:bg-red-700 text-white"
@@ -166,13 +184,13 @@ export default function CallPage() {
           <PhoneOff className="size-5" />
         </Button>
 
-        {/* Camera toggle button — D-04, D-12 */}
+        {/* Camera toggle button — D-04, D-12, D-05 (Phase 6: disabled while sharing) */}
         <Button
-          className={`h-10 w-10 rounded-full text-white transition-colors duration-150 ${!hasVideoTracks ? 'bg-slate-700 opacity-50 cursor-not-allowed' : isCameraOff ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-700 hover:bg-slate-600'}`}
-          aria-label={!hasVideoTracks ? COPY.cameraUnavailableLabel : isCameraOff ? COPY.cameraOnLabel : COPY.cameraOffLabel}
+          className={`h-10 w-10 rounded-full text-white transition-colors duration-150 ${!hasVideoTracks || isScreenSharing ? 'bg-slate-700 opacity-50 cursor-not-allowed' : isCameraOff ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+          aria-label={!hasVideoTracks ? COPY.cameraUnavailableLabel : isScreenSharing ? COPY.cameraDisabledSharingLabel : isCameraOff ? COPY.cameraOnLabel : COPY.cameraOffLabel}
           aria-pressed={isCameraOff}
-          aria-disabled={!hasVideoTracks}
-          disabled={!hasVideoTracks}
+          aria-disabled={!hasVideoTracks || isScreenSharing}
+          disabled={!hasVideoTracks || isScreenSharing}
           onClick={toggleCamera}
         >
           {isCameraOff || !hasVideoTracks ? <VideoOff className="size-4" /> : <Video className="size-4" />}
