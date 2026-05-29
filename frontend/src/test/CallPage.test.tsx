@@ -9,6 +9,8 @@ import CallPage from '@/pages/CallPage'
 const mockHangUp = vi.fn()
 const mockToggleMute = vi.fn()
 const mockToggleCamera = vi.fn()
+const mockStartScreenShare = vi.fn()
+const mockStopScreenShare = vi.fn()
 let mockLocalStream: MediaStream | null = null
 let mockRemoteStream: MediaStream | null = null
 let mockPeerUsername: string | null = 'bob'
@@ -16,6 +18,7 @@ let mockIsMuted = false
 let mockIsCameraOff = false
 let mockIceState: RTCIceConnectionState | null = null
 let mockCallStatus = 'connected'
+let mockIsScreenSharing = false
 
 // Mock CallContext — provides mutable values via closure
 vi.mock('@/contexts/CallContext', () => ({
@@ -34,6 +37,9 @@ vi.mock('@/contexts/CallContext', () => ({
     iceState: mockIceState,
     toggleMute: mockToggleMute,
     toggleCamera: mockToggleCamera,
+    isScreenSharing: mockIsScreenSharing,
+    startScreenShare: mockStartScreenShare,
+    stopScreenShare: mockStopScreenShare,
   }),
 }))
 
@@ -54,6 +60,8 @@ describe('CallPage', () => {
     mockHangUp.mockClear()
     mockToggleMute.mockClear()
     mockToggleCamera.mockClear()
+    mockStartScreenShare.mockClear()
+    mockStopScreenShare.mockClear()
     mockLocalStream = null
     mockRemoteStream = null
     mockPeerUsername = 'bob'
@@ -61,6 +69,7 @@ describe('CallPage', () => {
     mockIsCameraOff = false
     mockIceState = null
     mockCallStatus = 'connected'
+    mockIsScreenSharing = false
   })
 
   afterEach(() => {
@@ -228,6 +237,67 @@ describe('CallPage', () => {
     renderCallPage()
     const statusPill = screen.getByRole('status')
     expect(statusPill).toHaveAttribute('aria-live', 'polite')
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // Phase 6 — Screen sharing UI RED tests
+  // These tests FAIL until Plan 03 adds the Share button to CallPage.
+  // ──────────────────────────────────────────────────────────────────
+
+  it('SCRN-01: Share button has aria-label "Share screen" when not sharing', () => {
+    mockIsScreenSharing = false
+    renderCallPage()
+    const shareButton = screen.getByRole('button', { name: 'Share screen' })
+    expect(shareButton).toBeInTheDocument()
+  })
+
+  it('SCRN-01: Share button has aria-label "Stop sharing" when sharing', () => {
+    mockIsScreenSharing = true
+    renderCallPage()
+    const shareButton = screen.getByRole('button', { name: 'Stop sharing' })
+    expect(shareButton).toBeInTheDocument()
+  })
+
+  it('SCRN-01: clicking Share button (idle) calls startScreenShare', () => {
+    mockIsScreenSharing = false
+    renderCallPage()
+    const shareButton = screen.getByRole('button', { name: 'Share screen' })
+    fireEvent.click(shareButton)
+    expect(mockStartScreenShare).toHaveBeenCalledTimes(1)
+  })
+
+  it('SCRN-03: clicking Share button (active) calls stopScreenShare', () => {
+    mockIsScreenSharing = true
+    renderCallPage()
+    const shareButton = screen.getByRole('button', { name: 'Stop sharing' })
+    fireEvent.click(shareButton)
+    expect(mockStopScreenShare).toHaveBeenCalledTimes(1)
+  })
+
+  it('D-05: Camera button is disabled when isScreenSharing is true', () => {
+    mockIsScreenSharing = true
+    mockLocalStream = {
+      getVideoTracks: () => [{ enabled: true }],
+      getTracks: () => [],
+    } as unknown as MediaStream
+    renderCallPage()
+    const cameraButton = screen.getByRole('button', { name: 'Camera disabled while sharing' })
+    expect(cameraButton).toBeInTheDocument()
+    expect(cameraButton).toBeDisabled()
+  })
+
+  it('D-03: Share button carries aria-pressed="false" when idle', () => {
+    mockIsScreenSharing = false
+    renderCallPage()
+    const shareButton = screen.getByRole('button', { name: 'Share screen' })
+    expect(shareButton).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('D-03: Share button carries aria-pressed="true" when sharing', () => {
+    mockIsScreenSharing = true
+    renderCallPage()
+    const shareButton = screen.getByRole('button', { name: 'Stop sharing' })
+    expect(shareButton).toHaveAttribute('aria-pressed', 'true')
   })
 
 })
